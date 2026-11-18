@@ -18,12 +18,13 @@
   }
 
   // desenha a rede: entradas (com rótulos) -> ocultos -> saída
-  function network(ctx, net, inputs, labels, outLabel, x0, y0, w, h) {
-    const nIn = labels.length, nH = H.HIDDEN;
+  function network(ctx, net, inputs, labels, outLabel, x0, y0, w, h, outLabels) {
+    const nIn = labels.length, nH = H.HIDDEN, nOut = (net && net.nOut) || (outLabels ? outLabels.length : 1);
+    const rIn = Math.min(7, h / nIn / 2.4);
     const act = net && inputs ? H.forward(net, inputs) : null;
     const colX = [x0 + 78, x0 + w / 2 + 24, x0 + w - 28];
     const ys = n => Array.from({ length: n }, (_, i) => y0 + (i + 0.5) * h / n);
-    const yi = ys(nIn), yh = ys(nH), yo = y0 + h / 2;
+    const yi = ys(nIn), yh = ys(nH), yos = nOut > 1 ? ys(nOut).map(y => y0 + h / 4 + (y - y0) / 2) : [y0 + h / 2];
     if (net) {
       for (let j = 0; j < nH; j++) for (let i = 0; i < nIn; i++) {
         const wgt = net.w1[j * nIn + i];
@@ -32,11 +33,11 @@
         ctx.lineWidth = Math.min(3, 0.4 + Math.abs(wgt) * 0.8);
         ctx.beginPath(); ctx.moveTo(colX[0], yi[i]); ctx.lineTo(colX[1], yh[j]); ctx.stroke();
       }
-      for (let j = 0; j < nH; j++) {
-        const wgt = net.w2[j], a = act ? Math.abs(act.hidden[j]) : 0.4;
+      for (let o = 0; o < nOut; o++) for (let j = 0; j < nH; j++) {
+        const wgt = net.w2[o * nH + j], a = act ? Math.abs(act.hidden[j]) : 0.4;
         ctx.strokeStyle = 'rgba(' + (wgt > 0 ? C.pos : C.neg) + ',' + (0.15 + 0.7 * a) + ')';
         ctx.lineWidth = Math.min(4, 0.5 + Math.abs(wgt));
-        ctx.beginPath(); ctx.moveTo(colX[1], yh[j]); ctx.lineTo(colX[2], yo); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(colX[1], yh[j]); ctx.lineTo(colX[2], yos[o]); ctx.stroke();
       }
     }
     const node = (x, y, v, r) => {
@@ -46,12 +47,16 @@
       ctx.fill(); ctx.strokeStyle = '#cfd6ff'; ctx.lineWidth = 1; ctx.stroke();
     };
     for (let i = 0; i < nIn; i++) {
-      node(colX[0], yi[i], act ? inputs[i] : null, 7);
+      node(colX[0], yi[i], act ? inputs[i] : null, rIn);
       text(ctx, labels[i], colX[0] - 12, yi[i], 11, C.dim, 'right', 500);
     }
     for (let j = 0; j < nH; j++) node(colX[1], yh[j], act ? act.hidden[j] : null, 7);
-    node(colX[2], yo, act ? act.out : null, 9);
-    if (act) text(ctx, outLabel(act.out), colX[2], yo + 24, 16, C.text, 'center');
+    for (let o = 0; o < nOut; o++) {
+      const v = act ? act.outs[o] : null;
+      node(colX[2], yos[o], v, 9);
+      if (nOut > 1 && outLabels) text(ctx, outLabels[o], colX[2], yos[o] - 18, 11, C.dim, 'center', 600);
+      else if (act) text(ctx, outLabel(v), colX[2], yos[o] + 24, 16, C.text, 'center');
+    }
   }
 
   function panel(ctx, v) {
@@ -64,7 +69,8 @@
     text(ctx, 'robôs vivos: ' + v.alive + '/' + v.total, x + 20, 112, 15, C.text, 'left', 500);
     if (v.speedMul > 1) text(ctx, 'treino acelerado ×' + v.speedMul, x + 20, 134, 14, C.human, 'left', 600);
     text(ctx, 'CÉREBRO DO MELHOR ROBÔ', x + 20, 160, 13, C.dim);
-    network(ctx, v.net, v.inputs, v.labels, v.outLabel, x + 6, 172, PANEL_W - 16, 260);
+    network(ctx, v.net, v.inputs, v.labels, v.outLabel, x + 6, 172, PANEL_W - 16, 260, v.outLabels);
+    if (v.caption) text(ctx, v.caption, x + 20, 440, 11, C.dim, 'left', 500);
     text(ctx, 'TOP 5 HUMANOS', x + 20, 456, 13, C.dim);
     v.humans.forEach((hm, i) => {
       text(ctx, (i + 1) + '. ' + hm.name, x + 20, 482 + i * 26, 17, C.text, 'left', 600);

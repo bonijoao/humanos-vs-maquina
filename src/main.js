@@ -5,7 +5,7 @@
   const STEP = 1 / 60, MAX_TICKS = 5;
   const ls = (() => { try { return window.localStorage; } catch (e) { return null; } })();
   const rng = H.makeRng((Date.now() ^ (Math.random() * 1e9)) >>> 0);
-  const GAMES = [H.Games.drone, H.Games.race];
+  const GAMES = [H.Games.race, H.Games.plat, H.Games.drone];
   const GAME_KEY = 'hvm.game';
 
   // ---------- estado ----------
@@ -18,7 +18,7 @@
   let cardIdx = Math.floor(rng() * 100), attractCard = null, attractCardT = 0;
 
   const saveKey = g => 'hvm.v3.' + g.id; // v3: regras novas (nave mais fácil, corrida por tempo)
-  const newPopulation = () => Array.from({ length: H.POP_SIZE }, () => H.createNet(rng, game.nInputs));
+  const newPopulation = () => Array.from({ length: H.POP_SIZE }, () => H.createNet(rng, game.nInputs, game.nOutputs || 1));
 
   function loadGame(i) {
     gameIdx = (i + GAMES.length) % GAMES.length;
@@ -31,11 +31,11 @@
   }
 
   function restorePopulation(pop) {
-    const n = H.nParams(game.nInputs);
+    const n = H.nParams(game.nInputs, game.nOutputs || 1);
     try {
       if (Array.isArray(pop) && pop.length === H.POP_SIZE &&
           pop.every(p => Array.isArray(p) && p.length === n && p.every(Number.isFinite))) {
-        return pop.map(p => H.deserializeNet(p, game.nInputs));
+        return pop.map(p => H.deserializeNet(p, game.nInputs, game.nOutputs || 1));
       }
     } catch (e) { /* cai para população nova */ }
     return newPopulation();
@@ -126,7 +126,7 @@
       save.track = (save.track + 1) % game.TRACKS.length;
       H.saveState(ls, save, saveKey(game));
       startRun(false);
-      showToast('pista nova: ' + game.TRACKS[save.track].name + ' — a IA nunca viu esta!');
+      showToast(trackWord() + ' nova: ' + game.TRACKS[save.track].name + ' — a IA nunca viu esta!');
     }
   });
 
@@ -134,7 +134,7 @@
   const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   const NAME_TIMEOUT = 20; // segundos sem mexer na tela de nome
 
-  function humanAction(inp) { return game.axis === 'x' ? inp.axisX : inp.axis; }
+  function humanAction(inp) { return game.humanAction ? game.humanAction(inp) : game.axis === 'x' ? inp.axisX : inp.axis; }
 
   function update(ticks, inp) {
     const dt = ticks * STEP;
@@ -157,7 +157,7 @@
         save.track = (save.track + (inp.pressed.down ? 1 : n - 1)) % n;
         H.saveState(ls, save, saveKey(game));
         startRun(false);
-        showToast('pista: ' + game.TRACKS[save.track].name);
+        showToast(trackWord() + ': ' + game.TRACKS[save.track].name);
       }
       if (inp.any && modeT > 0.4) { startRun(true); attractCard = null; setMode('COUNTDOWN'); }
     } else if (mode === 'COUNTDOWN') {
@@ -223,7 +223,7 @@
       generation: save.generation, alive: robotsAlive(), total: agents.length,
       speedMul: mode === 'ATTRACT' ? speedMul : 1,
       net: bi >= 0 ? nets[bi] : null, inputs: bi >= 0 ? game.sensors(agents[bi], world) : null,
-      labels: game.inputLabels,
+      labels: game.inputLabels, caption: game.inputCaption, outLabels: game.outputLabels,
       outLabel: o => (game.axis === 'x' ? (o < 0 ? '◀' : '▶') : (o < 0 ? '▲' : '▼')),
       humans: save.humans.map(h => ({ name: h.name, score: fmt(h.score) })), padName: In.connectedName(),
     });
@@ -283,23 +283,28 @@
     }
   }
 
+  const trackWord = () => (game.id === 'plat' ? 'fase' : 'pista');
+
   function humanLine() {
-    if (asc()) return result.human === null ? 'Você completou ' + result.laps + ' de ' + game.LAPS + ' voltas' : 'Seu tempo: ' + fmt(result.human);
+    if (asc()) {
+      if (result.human !== null) return 'Seu tempo: ' + fmt(result.human);
+      return game.LAPS ? 'Você completou ' + result.laps + ' de ' + game.LAPS + ' voltas' : 'Não chegou na bandeira a tempo';
+    }
     return 'Você fez ' + result.human + ' pontos';
   }
   const robotFmt = s => (asc() ? fmt(s) : s + ' pontos');
 
   function drawSelector(C) {
     const y = R.GH - 150;
-    ctx.fillStyle = 'rgba(5,6,15,0.75)'; ctx.fillRect(R.GW / 2 - 300, y - 26, 600, game.TRACKS ? 82 : 52);
-    R.text(ctx, '◀', R.GW / 2 - 280, y, 24, C.dim, 'center', 800);
-    R.text(ctx, '▶', R.GW / 2 + 280, y, 24, C.dim, 'center', 800);
+    ctx.fillStyle = 'rgba(5,6,15,0.75)'; ctx.fillRect(R.GW / 2 - 380, y - 26, 760, game.TRACKS ? 82 : 52);
+    R.text(ctx, '◀', R.GW / 2 - 360, y, 24, C.dim, 'center', 800);
+    R.text(ctx, '▶', R.GW / 2 + 360, y, 24, C.dim, 'center', 800);
     GAMES.forEach((g, i) => {
-      const x = R.GW / 2 + (i - (GAMES.length - 1) / 2) * 220;
-      R.text(ctx, g.title, x, y, 26, i === gameIdx ? C.human : C.dim, 'center', 900);
-      if (i === gameIdx) { ctx.fillStyle = C.human; ctx.fillRect(x - 60, y + 16, 120, 4); }
+      const x = R.GW / 2 + (i - (GAMES.length - 1) / 2) * 230;
+      R.text(ctx, g.title, x, y, 24, i === gameIdx ? C.human : C.dim, 'center', 900);
+      if (i === gameIdx) { ctx.fillStyle = C.human; ctx.fillRect(x - 70, y + 16, 140, 4); }
     });
-    if (game.TRACKS) R.text(ctx, '▲ ▼  pista ' + (save.track + 1) + '/' + game.TRACKS.length + ': ' + game.TRACKS[save.track].name, R.GW / 2, y + 38, 18, C.text, 'center', 600);
+    if (game.TRACKS) R.text(ctx, '▲ ▼  ' + trackWord() + ' ' + (save.track + 1) + '/' + game.TRACKS.length + ': ' + game.TRACKS[save.track].name, R.GW / 2, y + 38, 18, C.text, 'center', 600);
   }
 
   // ---------- loop ----------

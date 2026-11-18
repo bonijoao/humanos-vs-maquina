@@ -24,6 +24,12 @@ def wait_mode(pg, modes, timeout):
         time.sleep(0.1)
     return False
 
+def select(pg, gid):
+    for _ in range(4):
+        if pg.evaluate('__hvm.game') == gid: return True
+        pg.keyboard.press('KeyG'); time.sleep(0.3)
+    return pg.evaluate('__hvm.game') == gid
+
 with sync_playwright() as p:
     b = p.chromium.launch(channel='chrome')
     errors = []
@@ -43,7 +49,8 @@ with sync_playwright() as p:
         pg.evaluate('localStorage.clear()'); pg.reload(); time.sleep(1)
     check('toques rápidos não se perdem (144 Hz)', ok == 8, f'{ok}/8')
 
-    # 2. tela de nome tem tempo limite
+    # 2. tela de nome tem tempo limite (na nave, onde bater acaba a partida)
+    select(pg, 'drone')
     pg.keyboard.press('Space')
     reached = wait_mode(pg, ['NAME'], 40)
     check('chegou na tela de nome', reached)
@@ -79,8 +86,7 @@ with sync_playwright() as p:
     pg.keyboard.press('KeyG'); time.sleep(0.5)
     g_after = pg.evaluate('__hvm.game')
     check('G troca de jogo', g_before != g_after, f'{g_before} -> {g_after}')
-    if g_after != 'race':
-        pg.keyboard.press('KeyG'); time.sleep(0.5)
+    select(pg, 'race')
     t0 = pg.evaluate('__hvm.save.track'); pg.keyboard.press('KeyT'); time.sleep(0.5)
     check('T troca de pista na corrida', pg.evaluate('__hvm.save.track') != t0)
     pg.keyboard.press('Space'); time.sleep(3.5)
@@ -95,6 +101,12 @@ with sync_playwright() as p:
     check('▲ ▼ na tela de espera troca de pista', pg.evaluate('__hvm.save.track') != tr)
     pg.reload(); time.sleep(1)
     check('jogo escolhido é lembrado ao recarregar', pg.evaluate('__hvm.game') == 'race')
+
+    # 7. plataforma: morrer não acaba a partida (volta ao início)
+    check('plataforma disponível', select(pg, 'plat'))
+    pg.keyboard.press('Space'); time.sleep(3.5)
+    pg.keyboard.down('ArrowRight'); time.sleep(4); pg.keyboard.up('ArrowRight')
+    check('plataforma: cair no buraco não acaba a partida', pg.evaluate('__hvm.mode') == 'PLAYING')
 
     real = [e for e in errors if 'teste' not in e]
     check('sem erros de página', not real, real)

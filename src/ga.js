@@ -18,21 +18,22 @@
   function mutate(net, rng) {
     const arr = H.serializeNet(net);
     for (let i = 0; i < arr.length; i++) if (rng() < MUT_PROB) arr[i] += H.gauss(rng) * MUT_SIGMA;
-    return H.deserializeNet(arr, net.nIn);
+    return H.deserializeNet(arr, net.nIn, net.nOut);
   }
 
   // pop: [{net, fitness}] -> net[] (elite primeiro, na ordem de fitness)
   function nextGeneration(pop, rng) {
-    const nIn = pop[0].net.nIn;
+    const nIn = pop[0].net.nIn, nOut = pop[0].net.nOut || 1;
     const sorted = pop.slice().sort((a, b) => b.fitness - a.fitness);
-    const next = sorted.slice(0, ELITE).map(p => H.deserializeNet(H.serializeNet(p.net), nIn));
+    const next = sorted.slice(0, ELITE).map(p => H.deserializeNet(H.serializeNet(p.net), nIn, nOut));
     while (next.length < POP_SIZE - RANDOM_NEW) next.push(mutate(tournament(sorted, rng).net, rng));
-    while (next.length < POP_SIZE) next.push(H.createNet(rng, nIn));
+    while (next.length < POP_SIZE) next.push(H.createNet(rng, nIn, nOut));
     return next;
   }
 
   function act(game, net, agent, world) {
-    return H.forward(net, game.sensors(agent, world)).out;
+    const r = H.forward(net, game.sensors(agent, world));
+    return (game.nOutputs || 1) > 1 ? r.outs : r.out;
   }
 
   // simula uma geração inteira sem desenhar; devolve o fitness de cada rede

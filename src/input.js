@@ -79,7 +79,7 @@
     prev = now;
     const any = pressed.a || pressed.b || pressed.start || pressed.anyBtn;
     const clamp = v => Math.max(-1, Math.min(1, v));
-    return { axis: clamp(axis), axisX: clamp(axisX), pressed, any };
+    return { axis: clamp(axis), axisX: clamp(axisX), pressed, held: now, any };
   }
 
   function connectedName() {

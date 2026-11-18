@@ -7,8 +7,12 @@ COMO ABRIR
   Ligue o controle ANTES ou depois, tanto faz — mas aperte um botão dele
   com a página aberta para o Chrome "acordar" o controle.
 
-OS DOIS JOGOS
+OS TRÊS JOGOS
   Na tela de espera, use o CONTROLE:  ◀ ▶ troca o jogo,  ▲ ▼ troca a pista.
+  PLATAFORMA  Chegue na bandeira no menor tempo. ◀ ▶ anda, botão (ou ▲) pula;
+           segurar o botão = pulo alto, tocar = pulo curto. Morreu, volta ao
+           início com o relógio correndo (limite 60 s). 3 fases (▲ ▼ troca).
+           Os robôs aprendem uma fase em 1–2 min em ×1.
   NAVE     Desvie das colunas. Segure ▲ para subir (tem gravidade leve).
            Colunas LARANJA se mexem. Bateu, acabou. Vale a distância.
   CORRIDA  3 voltas contra o relógio, vale o MENOR TEMPO. Bater na parede só
@@ -25,7 +29,7 @@ COMO JOGA
 TECLAS SÓ PARA VOCÊS (teclado do notebook, só na tela de espera)
   1 / 2 / 3  velocidade do treino: ×1 / ×5 / ×20
   R (segure 2 segundos)  reseta a IA do jogo atual — quando chegar turma nova
-  G / T      troca de jogo / de pista (o mesmo que ◀ ▶ / ▲ ▼ no controle)
+  G / T      troca de jogo / de pista ou fase (o mesmo que ◀ ▶ / ▲ ▼ no controle)
   F          tela cheia liga/desliga
 
 ANTES DE SAIR DE CASA

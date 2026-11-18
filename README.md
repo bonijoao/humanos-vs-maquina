@@ -2,7 +2,7 @@
 
 **Você consegue ganhar de uma IA que está aprendendo na sua frente?**
 
-Dois joguinhos de stand para conversar sobre inteligência artificial com o ensino médio.
+Três joguinhos de stand para conversar sobre inteligência artificial com o ensino médio.
 Enquanto ninguém joga, 50 robôs aprendem sozinhos, geração após geração, por **evolução**
 (algoritmo genético + uma rede neural pequena). Qualquer pessoa pega o controle e desafia
 a geração atual.
@@ -15,6 +15,7 @@ os cursos da **UFLA** como pano de fundo.
 | Geração 1: ninguém sabe nada | Algumas gerações depois |
 |---|---|
 | ![Corrida, geração 1](docs/img/corrida-geracao-1.png) | ![Corrida treinada](docs/img/corrida-treinada.png) |
+| ![Plataforma, geração 1](docs/img/plataforma-geracao-1.png) | ![Plataforma treinada](docs/img/plataforma-treinada.png) |
 | ![Nave, geração 1](docs/img/nave-geracao-1.png) | ![Nave treinada](docs/img/nave-treinada.png) |
 
 ## Os jogos
@@ -23,12 +24,17 @@ os cursos da **UFLA** como pano de fundo.
 você só vira. Bater na parede só freia. São cinco pistas, e a mesma IA corre em todas, então
 dá para trocar de pista e ver a máquina se virando num lugar que ela **nunca viu**.
 
+**🟨 Plataforma.** Uma fase por tela: corra, pule buracos e espinhos e chegue na bandeira
+no menor tempo. Morreu? Volta para o começo com o relógio correndo. São três fases de
+dificuldade crescente. Os robôs "enxergam" uma grade 5×5 de blocos em volta e decidem
+duas coisas, **andar** e **pular**. Na fase 3, os espinhos no teto obrigam a aprender o pulo curto.
+
 **🚀 Nave.** Desvie das colunas, algumas se mexem. Tem gravidade leve: segure ▲ para subir.
 Vale a distância.
 
-Nos dois, o robô **não vê a tela**. Ele só sabe a distância até a parede em 7 direções,
-os riscos rosa que saem do melhor robô, como o sensor de ré de um carro ou o lidar de
-um carro autônomo. No painel lateral dá para ver o "cérebro" dele decidindo em tempo real.
+Em todos, o robô **não vê a tela**. Na corrida e na nave, ele só sabe a distância até a
+parede em 7 direções, os riscos rosa que saem do melhor robô, como o sensor de ré de um
+carro ou o lidar de um carro autônomo. Na plataforma, ele vê só os blocos ao redor. No painel lateral dá para ver o "cérebro" dele decidindo em tempo real.
 
 ## O que dá para conversar
 
@@ -51,7 +57,7 @@ Aperte **F** para tela cheia.
 | qualquer botão / Espaço | começa a partida |
 | analógico, direcional / setas | joga |
 | ◀ ▶ na tela de espera | troca de jogo |
-| ▲ ▼ na tela de espera | troca de pista (corrida) |
+| ▲ ▼ na tela de espera | troca de pista / fase |
 
 Funciona com controle de Xbox, PlayStation, Switch ou qualquer genérico USB/Bluetooth.
 
@@ -67,8 +73,9 @@ JavaScript puro e Canvas, sem dependências e sem build.
 
 ```
 src/games/race.js   corrida: física, pistas, sensores
+src/games/plat.js   plataforma: fases, física, grade de visão
 src/games/drone.js  nave: física, obstáculos, sensores
-src/nn.js           rede neural 8 → 8 → 1 (81 números)
+src/nn.js           rede neural pequena (entradas → 8 → 1 ou 2 saídas)
 src/ga.js           algoritmo genético: elite, torneio, mutação
 src/main.js         loop, telas, placar
 src/cards.js        cartões de curiosidade

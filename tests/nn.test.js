@@ -31,3 +31,21 @@ test('serialize/deserialize preserva a rede', () => {
   assert.strictEqual(NN.forward(copy, inp).out, NN.forward(net, inp).out);
   assert.deepStrictEqual(NN.serializeNet(copy), NN.serializeNet(net));
 });
+
+test('rede com 2 saídas: outs tem 2 valores em [-1,1] e serialização ida e volta', () => {
+  const net = NN.createNet(makeRng(5), 6, 2);
+  assert.strictEqual(net.nOut, 2);
+  const r = NN.forward(net, [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]);
+  assert.strictEqual(r.outs.length, 2);
+  for (const o of r.outs) assert.ok(o >= -1 && o <= 1);
+  assert.strictEqual(r.out, r.outs[0]);
+  const arr = NN.serializeNet(net);
+  assert.strictEqual(arr.length, NN.nParams(6, 2));
+  const copy = NN.deserializeNet(arr, 6, 2);
+  assert.deepStrictEqual(NN.forward(copy, [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]).outs, r.outs);
+});
+
+test('rede de 1 saída mantém o formato antigo (placar/IA salvos continuam válidos)', () => {
+  assert.strictEqual(NN.nParams(8), 8 * NN.HIDDEN + NN.HIDDEN + NN.HIDDEN + 1);
+  assert.strictEqual(NN.nParams(8, 1), NN.nParams(8));
+});

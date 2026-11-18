@@ -70,3 +70,27 @@ test('race: poucos terminam na geração 1; muitos terminam na 10, com tempo men
   assert.ok(fin10 >= 3 * Math.max(1, fin1), 'muitos depois: ' + msg);
   assert.ok(t10 < t1, 'tempo cai: ' + msg);
 });
+
+// Plataforma: na fase difícil, ninguém chega na 1ª geração; em até 25, alguns chegam.
+test('plat: fase 3 — ninguém chega na geração 1, alguns chegam até a 25 (2 de 3 sementes)', () => {
+  const P = require('../src/games/plat.js');
+  const ok = [11, 22, 33].map(seed => {
+    const rng = makeRng(seed);
+    let nets = Array.from({ length: GA.POP_SIZE }, () => NN.createNet(rng, P.nInputs, P.nOutputs));
+    let firstFin = null, gen1Fin = 0;
+    for (let g = 1; g <= 25 && firstFin === null; g++) {
+      const w = P.createWorld(g, { track: 2 }); const ag = nets.map(() => P.createAgent(w));
+      for (let s = 0; s < P.maxSteps; s++) {
+        P.stepWorld(w); let a = 0;
+        ag.forEach((c, i) => { if (c.alive) { P.stepAgent(c, w, GA.act(P, nets[i], c, w)); if (c.alive) a++; } });
+        if (!a) break;
+      }
+      const fin = ag.filter(c => c.finished).length;
+      if (g === 1) gen1Fin = fin;
+      if (fin && firstFin === null) firstFin = g;
+      nets = GA.nextGeneration(nets.map((net, i) => ({ net, fitness: P.fitness(ag[i]) })), rng);
+    }
+    return gen1Fin === 0 && firstFin !== null;
+  });
+  assert.ok(ok.filter(Boolean).length >= 2, JSON.stringify(ok));
+});
