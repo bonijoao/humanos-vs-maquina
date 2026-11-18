@@ -1,6 +1,10 @@
 (function (root) {
   const DEAD = 0.2;
-  const keys = new Set();
+  const keys = new Set(), tapped = new Set();
+  const TAP_MAP = {
+    a: ['Space', 'Enter'], b: ['Escape'], up: ['ArrowUp', 'KeyW'], down: ['ArrowDown', 'KeyS'],
+    left: ['ArrowLeft'], right: ['ArrowRight'],
+  };
   let prev = {};
   let opCb = () => {};
   let rDownAt = null, rFired = false;
@@ -9,6 +13,7 @@
     if (['ArrowUp', 'ArrowDown', ' ', 'Space'].includes(e.key)) e.preventDefault();
     if (e.repeat) return;
     keys.add(e.code);
+    tapped.add(e.code); // garante que toques rápidos (aperta e solta no mesmo quadro) contem
     if (e.code === 'Digit1') opCb('speed1');
     if (e.code === 'Digit2') opCb('speed5');
     if (e.code === 'Digit3') opCb('speed20');
@@ -48,8 +53,9 @@
 
     const ax = p ? p.axes[0] || 0 : 0;
     const now = {
-      a: btn(p, 0) || keys.has('Space') || keys.has('Enter'),
-      b: btn(p, 1) || keys.has('Escape'),
+      // qualquer botão frontal confirma (no controle do Switch o "A" fica à direita)
+      a: btn(p, 0) || btn(p, 1) || btn(p, 2) || btn(p, 3) || keys.has('Space') || keys.has('Enter'),
+      b: btn(p, 8) || keys.has('Escape'),
       start: btn(p, 9),
       up: axis < -0.5,
       down: axis > 0.5,
@@ -58,7 +64,10 @@
       anyBtn: p ? p.buttons.some((b, i) => b.pressed && i < 12) : false,
     };
     const pressed = {};
-    for (const k in now) pressed[k] = now[k] && !prev[k];
+    for (const k in now) {
+      pressed[k] = (now[k] && !prev[k]) || (TAP_MAP[k] || []).some(c => tapped.has(c));
+    }
+    tapped.clear();
     prev = now;
     const any = pressed.a || pressed.b || pressed.start || pressed.anyBtn;
     return { axis: Math.max(-1, Math.min(1, axis)), pressed, any };
