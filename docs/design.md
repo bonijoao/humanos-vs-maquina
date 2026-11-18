@@ -108,3 +108,19 @@ Curtos, um por vez, alternando:
 
 Cores exatas, constantes de física e dificuldade, parâmetros do algoritmo genético
 (ajustar até a IA aprender visivelmente em ~2–5 min a ×1), texto final dos cartões.
+
+## Revisão 2 (2026-11-18, depois do primeiro teste)
+
+Problema: a máquina dominava em ~3 gerações. Causa: o sensor dava a distância exata
+até o centro da brecha, então um único neurônio resolvia o jogo.
+
+Decisão do usuário: fazer os dois caminhos.
+
+- **Jogo 1 — Nave (revisado):** sensores viram 7 raios ("lidar") + velocidade vertical;
+  física com gravidade e inércia; brechas que se mexem conforme a dificuldade.
+  O painel desenha os raios do melhor robô.
+- **Jogo 2 — Corrida:** pista fechada vista de cima, carro anda sozinho, analógico só
+  vira. Robôs com raios. Várias pistas; trocar de pista mostra generalização.
+- Os dois jogos compartilham rede neural, evolução, placar (separado por jogo),
+  entrada e cartões. Tecla de operador alterna o jogo e a pista.
+- Meta medida por simulação: a IA leva ~5–10 min a ×1 para dominar cada jogo.
