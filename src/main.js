@@ -18,7 +18,8 @@
   let cardIdx = Math.floor(rng() * 100), attractCard = null, attractCardT = 0;
 
   const saveKey = g => 'hvm.v3.' + g.id; // v3: regras novas (nave mais fácil, corrida por tempo)
-  const newPopulation = () => Array.from({ length: H.POP_SIZE }, () => H.createNet(rng, game.nInputs, game.nOutputs || 1));
+  const popSize = () => game.popSize || H.POP_SIZE;
+  const newPopulation = () => Array.from({ length: popSize() }, () => H.createNet(rng, game.nInputs, game.nOutputs || 1));
 
   function loadGame(i) {
     gameIdx = (i + GAMES.length) % GAMES.length;
@@ -33,7 +34,7 @@
   function restorePopulation(pop) {
     const n = H.nParams(game.nInputs, game.nOutputs || 1);
     try {
-      if (Array.isArray(pop) && pop.length === H.POP_SIZE &&
+      if (Array.isArray(pop) && pop.length === popSize() &&
           pop.every(p => Array.isArray(p) && p.length === n && p.every(Number.isFinite))) {
         return pop.map(p => H.deserializeNet(p, game.nInputs, game.nOutputs || 1));
       }
@@ -51,12 +52,24 @@
   function finishGeneration() {
     const fit = agents.map(game.fitness);
     const best = bestScore(agents.map(game.score));
-    if (best !== null && (!save.bestMachine || better(best, save.bestMachine))) save.bestMachine = best;
+    const r = rec();
+    if (best !== null && (!r.bestMachine || better(best, r.bestMachine))) r.bestMachine = best;
     nets = H.nextGeneration(nets.map((net, i) => ({ net, fitness: fit[i] })), rng);
     save.generation++;
     save.population = nets.map(H.serializeNet);
     H.saveState(ls, save, saveKey(game));
     return best;
+  }
+
+  // recorde e top 5 são por pista/fase (tempos de pistas diferentes não se comparam);
+  // a IA (população) é a mesma em todas
+  function rec() {
+    if (!game.TRACKS) return save;
+    if (!save.records || typeof save.records !== 'object') save.records = {};
+    const k = String(save.track);
+    const r = save.records[k];
+    if (!r || !Array.isArray(r.humans)) save.records[k] = { bestMachine: 0, humans: [] };
+    return save.records[k];
   }
 
   // placar: na corrida vale o MENOR tempo; null = não terminou
@@ -111,6 +124,7 @@
     if (cmd.startsWith('speed')) showToast('treino ×' + speedMul);
     if (cmd === 'reset') {
       H.resetMachine(save);
+      Object.values(save.records || {}).forEach(r => { r.bestMachine = 0; });
       nets = newPopulation();
       H.saveState(ls, save, saveKey(game));
       startRun(false);
@@ -181,7 +195,7 @@
       }
     } else if (mode === 'RESULT') {
       if (modeT > 5 || (modeT > 1 && inp.pressed.a)) {
-        if (H.qualifies(save, result.human, asc())) { nameEntry = { letters: [0, 0, 0], pos: 0 }; setMode('NAME'); }
+        if (H.qualifies(rec(), result.human, asc())) { nameEntry = { letters: [0, 0, 0], pos: 0 }; setMode('NAME'); }
         else goCard();
       }
     } else if (mode === 'NAME') {
@@ -200,7 +214,7 @@
   }
 
   function saveName() {
-    H.addHumanScore(save, nameEntry.letters.map(i => LETTERS[i]).join(''), result.human, asc());
+    H.addHumanScore(rec(), nameEntry.letters.map(i => LETTERS[i]).join(''), result.human, asc());
     H.saveState(ls, save, saveKey(game));
     goCard();
   }
@@ -217,7 +231,7 @@
     if (bi >= 0) game.sensors(agents[bi], world); // atualiza os raios para desenhar
     game.draw(ctx, world, agents, bi, human, trail, C);
 
-    R.hud(ctx, { bestHuman: fmt(H.bestHuman(save) || null), bestMachine: fmt(save.bestMachine || null), score: human ? (game.hudText ? game.hudText(human) : String(game.score(human))) : null });
+    R.hud(ctx, { bestHuman: fmt(H.bestHuman(rec()) || null), bestMachine: fmt(rec().bestMachine || null), score: human ? (game.hudText ? game.hudText(human) : String(game.score(human))) : null });
     R.panel(ctx, {
       title: game.title + (game.TRACKS ? ' · ' + game.TRACKS[save.track].name : ''),
       generation: save.generation, alive: robotsAlive(), total: agents.length,
@@ -225,7 +239,7 @@
       net: bi >= 0 ? nets[bi] : null, inputs: bi >= 0 ? game.sensors(agents[bi], world) : null,
       labels: game.inputLabels, caption: game.inputCaption, outLabels: game.outputLabels,
       outLabel: o => (game.axis === 'x' ? (o < 0 ? '◀' : '▶') : (o < 0 ? '▲' : '▼')),
-      humans: save.humans.map(h => ({ name: h.name, score: fmt(h.score) })), padName: In.connectedName(),
+      humans: rec().humans.map(h => ({ name: h.name, score: fmt(h.score) })), padName: In.connectedName(),
     });
 
     if (mode === 'ATTRACT') {
@@ -236,7 +250,7 @@
       ]);
       if (blink) R.text(ctx, 'APERTE QUALQUER BOTÃO PARA DESAFIAR A MÁQUINA', R.GW / 2, R.GH - 42, 26, C.human, 'center', 800);
       drawSelector(C);
-      if (attractCard) R.card(ctx, attractCard, 24, 70, 420, true);
+      if (attractCard) R.card(ctx, attractCard, 24, 150, 420, true);
     } else if (mode === 'COUNTDOWN') {
       R.overlay(ctx, 0.35);
       R.center(ctx, [
@@ -277,7 +291,7 @@
       R.card(ctx, result.card, R.GW / 2 - 400, R.GH / 2 - 150, 800, false);
     }
 
-    if (toast) R.text(ctx, toast.s, R.GW / 2, 90, 24, C.human, 'center', 800);
+    if (toast) R.text(ctx, toast.s, R.GW / 2, 190, 24, C.human, 'center', 800);
     if (DEBUG_INPUT) {
       R.text(ctx, 'debug: ' + JSON.stringify({ y: inp.axis.toFixed(2), x: (inp.axisX || 0).toFixed(2), pad: In.connectedName(), held: inp.pressed }), 10, R.GH - 14, 13, '#0f0');
     }
@@ -295,7 +309,7 @@
   const robotFmt = s => (asc() ? fmt(s) : s + ' pontos');
 
   function drawSelector(C) {
-    const y = R.GH - 150;
+    const y = 92; // no topo: não cobre a fase
     ctx.fillStyle = 'rgba(5,6,15,0.75)'; ctx.fillRect(R.GW / 2 - 380, y - 26, 760, game.TRACKS ? 82 : 52);
     R.text(ctx, '◀', R.GW / 2 - 360, y, 24, C.dim, 'center', 800);
     R.text(ctx, '▶', R.GW / 2 + 360, y, 24, C.dim, 'center', 800);

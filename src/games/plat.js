@@ -2,12 +2,12 @@
 // Humano que morre volta ao início com o relógio correndo; robô que morre sai da geração.
 // O robô "enxerga" uma grade 5×5 de blocos ao redor dele e decide ANDAR e PULAR.
 (function (root) {
-  const W = 1280, H = 720, TILE = 40, COLS = 32, ROWS = 18;
+  const W = 1280, H = 720, TILE = 32, COLS = 40, ROWS = 22;
   const GRAV = 0.6, JUMP = 11.5, FALL_MAX = 12, VX_MAX = 4.6;
-  const ACC_GROUND = 0.3, ACC_AIR = 0.14, JUMP_CUT = -4, COYOTE = 6;
-  const PW = 24, PH = 30;
+  const ACC_GROUND = 0.3, ACC_AIR = 0.16, JUMP_CUT = -4, COYOTE = 8, JUMP_BUFFER = 8;
+  const PW = 22, PH = 28;
   const STALL_STEPS = 240, MAX_STEPS = 60 * 60;
-  const GX0 = -1, GX1 = 3, GY0 = -3, GY1 = 1; // grade de visão (em blocos)
+  const GX0 = -1, GX1 = 4, GY0 = -3, GY1 = 1; // grade de visão (em blocos)
 
   // ---------- fases ----------
   // construídas por retângulos para não errar a contagem de colunas
@@ -19,22 +19,27 @@
     return g.map(r => r.join(''));
   }
 
+  // chão em cima na linha 19; o pulo alcança ~3 blocos de altura e ~5 de distância
   const LEVELS = [
     { name: 'Primeiros pulos', rows: build([
-      ['#', 0, 5, 15, 17], ['#', 8, 13, 15, 17], ['^', 10, 11, 14], ['#', 16, 18, 15, 17],
-      ['#', 21, 26, 15, 17], ['^', 24, 24, 14], ['#', 29, 31, 15, 17],
-      ['#', 12, 14, 11], ['S', 1, 1, 14], ['G', 30, 30, 14],
+      ['#', 0, 16, 19, 21], ['^', 12, 12, 18],                       // pista longa + 1 espinho
+      ['#', 19, 25, 19, 21], ['^', 22, 23, 18],                      // buraco de 2 + 2 espinhos
+      ['#', 26, 31, 19, 21], ['#', 28, 29, 17, 18],                  // degrau
+      ['#', 34, 39, 19, 21],                                         // buraco de 2
+      ['#', 8, 10, 15], ['S', 2, 2, 18], ['G', 38, 38, 18],
     ]) },
     { name: 'Escadaria', rows: build([
-      ['#', 0, 4, 15, 17], ['#', 5, 7, 13, 17], ['#', 8, 9, 11, 17], ['^', 10, 15, 17],
-      ['#', 12, 13, 12], ['#', 16, 19, 13, 17], ['^', 18, 18, 12], ['#', 20, 31, 15, 17],
-      ['^', 23, 23, 14], ['^', 27, 28, 14], ['#', 25, 26, 11], ['S', 1, 1, 14], ['G', 31, 31, 14],
+      ['#', 0, 8, 19, 21], ['#', 9, 10, 17, 21], ['#', 11, 12, 15, 21],
+      ['^', 13, 19, 21], ['#', 15, 17, 15],                          // fosso com espinhos + ponte
+      ['#', 20, 23, 16, 21], ['^', 22, 22, 15],
+      ['#', 24, 39, 19, 21], ['^', 28, 28, 18], ['^', 33, 34, 18], ['#', 30, 32, 15],
+      ['S', 2, 2, 18], ['G', 38, 38, 18],
     ]) },
     { name: 'Ilhas no ar', rows: build([
-      ['#', 0, 7, 15, 17], ['^', 8, 27, 17],
-      ['#', 10, 10, 13], ['#', 13, 13, 12], ['#', 16, 16, 11], ['#', 19, 19, 12], ['#', 22, 22, 11], ['#', 25, 25, 13],
-      ['^', 12, 23, 7], ['#', 12, 23, 6],
-      ['#', 28, 31, 15, 17], ['S', 1, 1, 14], ['G', 30, 30, 14],
+      ['#', 0, 8, 19, 21], ['^', 9, 33, 21],
+      ['#', 11, 12, 17], ['#', 15, 16, 15], ['#', 19, 20, 14], ['#', 23, 24, 15], ['#', 27, 28, 16], ['#', 31, 32, 17],
+      ['#', 14, 30, 9], ['^', 14, 30, 10],                           // teto de espinhos: pulo curto!
+      ['#', 34, 39, 19, 21], ['S', 2, 2, 18], ['G', 38, 38, 18],
     ]) },
   ];
 
@@ -122,7 +127,7 @@
       const tx = Math.floor(x / TILE), ty = Math.floor(y / TILE);
       if (tileAt(w, tx, ty) !== ch) continue;
       if (ch !== '^') return true;
-      if (y > ty * TILE + TILE * 0.45) return true; // espinho: só a parte de baixo do bloco machuca
+      if (y > ty * TILE + TILE * 0.6) return true; // espinho: só encostar na ponta de verdade machuca
     }
     return false;
   }
@@ -144,12 +149,15 @@
     const target = move * VX_MAX;
     c.vx += (target - c.vx) * (c.onGround ? ACC_GROUND : ACC_AIR);
     c.air = c.onGround ? 0 : c.air + 1;
-    if (jump && c.air < COYOTE && c.vy >= 0) { c.vy = -JUMP; c.air = COYOTE; }
+    // apertou um pouquinho antes de tocar o chão também vale (jump buffer)
+    c.buf = jump && !c.prevJump ? JUMP_BUFFER : Math.max(0, (c.buf || 0) - 1);
+    c.prevJump = jump;
+    if ((jump || c.buf > 0) && c.air < COYOTE && c.vy >= 0) { c.vy = -JUMP; c.air = COYOTE; c.buf = 0; }
     if (!jump && c.vy < JUMP_CUT) c.vy = JUMP_CUT;   // soltou cedo = pulo baixo
     c.vy = Math.min(FALL_MAX, c.vy + GRAV);
     moveX(c, w); moveY(c, w);
 
-    if (c.y - PH / 2 > H || touching(c, w, '^', 3)) { die(c, w); return; }
+    if (c.y - PH / 2 > H || touching(c, w, '^', 5)) { die(c, w); return; }
     if (touching(c, w, 'G', 0)) { c.finished = true; c.finishStep = c.steps; c.alive = false; return; }
 
     const tx = Math.floor(c.x / TILE), ty = Math.floor(c.y / TILE);
@@ -269,8 +277,8 @@
     nInputs: gridLabels.length + 3, nOutputs: 2,
     inputLabels: [...gridLabels, 'vel. →', 'vel. ↓', 'no chão'],
     outputLabels: ['andar', 'pular'],
-    inputCaption: 'grade 5×5 em volta + velocidade',
-    TRACKS: LEVELS, LEVELS, TILE, W, H,
+    inputCaption: 'grade 6×5 em volta + velocidade',
+    TRACKS: LEVELS, LEVELS, TILE, W, H, popSize: 100,
     createWorld, stepWorld, createAgent, stepAgent, sensors, fitness, score, formatScore, hudText, draw, solidAt,
     humanAction: inp => [inp.axisX, inp.held && (inp.held.a || inp.held.up) ? 1 : -1],
     trailPoint: c => ({ x: c.x, y: c.y }),

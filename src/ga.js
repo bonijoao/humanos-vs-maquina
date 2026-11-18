@@ -26,8 +26,9 @@
     const nIn = pop[0].net.nIn, nOut = pop[0].net.nOut || 1;
     const sorted = pop.slice().sort((a, b) => b.fitness - a.fitness);
     const next = sorted.slice(0, ELITE).map(p => H.deserializeNet(H.serializeNet(p.net), nIn, nOut));
-    while (next.length < POP_SIZE - RANDOM_NEW) next.push(mutate(tournament(sorted, rng).net, rng));
-    while (next.length < POP_SIZE) next.push(H.createNet(rng, nIn, nOut));
+    const size = pop.length;
+    while (next.length < size - RANDOM_NEW) next.push(mutate(tournament(sorted, rng).net, rng));
+    while (next.length < size) next.push(H.createNet(rng, nIn, nOut));
     return next;
   }
 
