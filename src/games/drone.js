@@ -6,13 +6,13 @@
 
   const W = 1280, H = 720;
   const DRONE_X = 220, DRONE_R = 14;
-  const GRAV = 0.32, THRUST = 0.7, DAMP = 0.985, VMAX = 9;
+  const GRAV = 0.22, THRUST = 0.55, DAMP = 0.93, VMAX = 7;
   const HOVER = -GRAV / THRUST;               // ação que equilibra a gravidade
-  const GAP0 = 200, GAP_MIN = 150;
+  const GAP0 = 240, GAP_MIN = 180;
   const OBST_W = 80, OBST_SPACING = 380;
-  const SPEED0 = 4, SPEED_MAX = 9, SPEED_INC = 0.001;
+  const SPEED0 = 3.5, SPEED_MAX = 8, SPEED_INC = 0.0006;
   const MARGIN = 60;
-  const N_RAYS = 7, RAY_LEN = 520, RAY_STEP = 10;
+  const N_RAYS = 7, RAY_LEN = 300, RAY_STEP = 10;
   const RAY_ANG = Array.from({ length: N_RAYS }, (_, i) => (-70 + i * 140 / (N_RAYS - 1)) * Math.PI / 180);
 
   function createWorld(seed) {
@@ -25,12 +25,12 @@
     const d = difficulty(w);
     const gapH = GAP0 - (GAP0 - GAP_MIN) * d;
     w.count++;
-    // a partir do 4º obstáculo, algumas brechas sobem e descem (cada vez mais)
-    const moving = w.count > 1 && w.rng() < 0.5 + 0.4 * d;
-    const amp = moving ? 50 + 90 * d * w.rng() + 30 * w.rng() : 0;
+    // a partir do 5º obstáculo, algumas brechas sobem e descem (cada vez mais)
+    const moving = w.count > 4 && w.rng() < 0.3 + 0.4 * d;
+    const amp = moving ? 30 + 70 * d * w.rng() + 20 * w.rng() : 0;
     const lo = MARGIN + gapH / 2 + amp, hi = H - MARGIN - gapH / 2 - amp;
     const baseY = lo + (hi - lo) * w.rng();
-    w.obstacles.push({ x, baseY, gapY: baseY, gapH, amp, phase: w.rng() * Math.PI * 2, freq: 0.02 + 0.02 * w.rng() });
+    w.obstacles.push({ x, baseY, gapY: baseY, gapH, amp, phase: w.rng() * Math.PI * 2, freq: 0.012 + 0.012 * w.rng() });
   }
 
   function stepWorld(w) {
