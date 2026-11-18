@@ -12,9 +12,9 @@
       && (s.population === null || Array.isArray(s.population));
   }
 
-  function loadState(storage) {
+  function loadState(storage, key) {
     try {
-      const raw = storage && storage.getItem(KEY);
+      const raw = storage && storage.getItem(key || KEY);
       if (!raw) return defaultState();
       const s = JSON.parse(raw);
       return valid(s) ? s : defaultState();
@@ -23,8 +23,8 @@
     }
   }
 
-  function saveState(storage, state) {
-    try { storage && storage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* sem espaço/bloqueado */ }
+  function saveState(storage, state, key) {
+    try { storage && storage.setItem(key || KEY, JSON.stringify(state)); } catch (e) { /* sem espaço/bloqueado */ }
   }
 
   function qualifies(state, score) {

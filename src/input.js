@@ -18,6 +18,8 @@
     if (e.code === 'Digit2') opCb('speed5');
     if (e.code === 'Digit3') opCb('speed20');
     if (e.code === 'KeyF') opCb('fullscreen');
+    if (e.code === 'KeyG') opCb('game');
+    if (e.code === 'KeyT') opCb('track');
     if (e.code === 'KeyR') { rDownAt = performance.now(); rFired = false; }
   });
   addEventListener('keyup', e => {
@@ -52,6 +54,12 @@
     if (kDown && !kUp) axis = 1;
 
     const ax = p ? p.axes[0] || 0 : 0;
+    let axisX = Math.abs(ax) > DEAD ? (ax - Math.sign(ax) * DEAD) / (1 - DEAD) : 0;
+    if (btn(p, 14)) axisX = -1;
+    if (btn(p, 15)) axisX = 1;
+    const kL = keys.has('ArrowLeft') || keys.has('KeyA'), kR = keys.has('ArrowRight') || keys.has('KeyD');
+    if (kL && !kR) axisX = -1;
+    if (kR && !kL) axisX = 1;
     const now = {
       // qualquer botão frontal confirma (no controle do Switch o "A" fica à direita)
       a: btn(p, 0) || btn(p, 1) || btn(p, 2) || btn(p, 3) || keys.has('Space') || keys.has('Enter'),
@@ -70,7 +78,8 @@
     tapped.clear();
     prev = now;
     const any = pressed.a || pressed.b || pressed.start || pressed.anyBtn;
-    return { axis: Math.max(-1, Math.min(1, axis)), pressed, any };
+    const clamp = v => Math.max(-1, Math.min(1, v));
+    return { axis: clamp(axis), axisX: clamp(axisX), pressed, any };
   }
 
   function connectedName() {

@@ -7,15 +7,26 @@ COMO ABRIR
   Ligue o controle ANTES ou depois, tanto faz — mas aperte um botão dele
   com a página aberta para o Chrome "acordar" o controle.
 
+OS DOIS JOGOS (troque com a tecla G na tela de espera)
+  NAVE     Desvie das colunas. Tem gravidade: segure ▲ para subir.
+           Colunas LARANJA se mexem. Os robôs enxergam com 7 raios.
+  CORRIDA  Carrinho visto de cima, acelera sozinho e fica cada vez mais rápido.
+           ◀ ▶ para virar. Os robôs enxergam a borda da pista com 7 raios.
+           3 pistas (tecla T). A IA treinada numa pista tenta correr numa
+           pista que nunca viu: ótimo para falar de "generalização".
+  Cada jogo tem sua própria IA e seu próprio placar.
+
 COMO JOGA
   Qualquer botão do controle (ou Espaço) começa a partida.
-  Analógico / direcional para cima e para baixo (ou setas / W S).
-  Você é o drone AMARELO. Os robôs ROSA são a IA aprendendo.
+  Analógico / direcional (ou setas). Você é o AMARELO; os ROSA são a IA.
+  Os riscos rosa saindo do melhor robô são os raios: o que ele "enxerga".
 
-TECLAS SÓ PARA VOCÊS (teclado do notebook)
-  1 / 2 / 3  velocidade do treino: ×1 / ×5 / ×20 (só na tela de espera)
-  R (segure 2 segundos)  reseta a IA do zero — bom quando chega turma nova,
+TECLAS SÓ PARA VOCÊS (teclado do notebook, só na tela de espera)
+  1 / 2 / 3  velocidade do treino: ×1 / ×5 / ×20
+  R (segure 2 segundos)  reseta a IA do jogo atual — quando chegar turma nova,
                          para eles verem a máquina "nascer burra" e aprender
+  G          troca de jogo (nave / corrida)
+  T          troca de pista (só na corrida)
   F          tela cheia liga/desliga
 
 ANTES DE SAIR DE CASA
@@ -24,14 +35,17 @@ ANTES DE SAIR DE CASA
   não conta como "uso" para o Windows.) Leve o carregador do controle.
 
 DICAS PARA O STAND
-  - Com ×20, a IA fica boa em ~1 minuto. Com ×1, em ~3–5 minutos.
-  - Depois de uns 5 minutos treinando, quase ninguém ganha da máquina.
-    Se quiser que a turma tenha chance, resete (R) de tempos em tempos.
-  - O placar e a IA ficam salvos no navegador: fechar e abrir de novo continua
-    de onde parou. Para zerar o placar dos humanos: F12 > Console >
+  - Em ×1, a geração 1 bate logo; a máquina leva uns 3–5 min para ganhar de
+    um iniciante e continua melhorando por uns 15 min. Em ×20, tudo isso em
+    menos de 1 minuto.
+  - Roteiro: R (reset) com a turma olhando → deixar uns minutos em ×1 → chamar
+    alguém para jogar → T (pista nova) para ver a IA se virar no desconhecido.
+  - Placar e IA ficam salvos no navegador. Para zerar tudo: F12 > Console >
     localStorage.clear()  e recarregue.
 
 PARA PROGRAMADORES
-  src/world.js   física e obstáculos       src/nn.js     rede neural 6-6-1
-  src/ga.js      algoritmo genético         src/main.js   loop e telas
-  src/cards.js   textos dos cartões         testes: npm test
+  src/games/drone.js  jogo da nave        src/games/race.js  jogo da corrida
+  src/nn.js  rede neural                  src/ga.js          algoritmo genético
+  src/main.js  loop e telas               src/cards.js       textos dos cartões
+  testes: npm test  |  python -I tests/browser_check.py
+  curva de aprendizado: node tools/curve.js race 20 3 '{"track":0}'

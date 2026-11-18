@@ -1,6 +1,6 @@
 (function (root) {
   const H = typeof module !== 'undefined'
-    ? (require('./rng.js'), require('./world.js'), require('./nn.js'), globalThis.HVM)
+    ? (require('./rng.js'), require('./nn.js'), globalThis.HVM)
     : root.HVM;
 
   const POP_SIZE = 50, ELITE = 5, RANDOM_NEW = 5, TOURNAMENT = 3;
@@ -17,41 +17,40 @@
 
   function mutate(net, rng) {
     const arr = H.serializeNet(net);
-    for (let i = 0; i < arr.length; i++) {
-      if (rng() < MUT_PROB) arr[i] += H.gauss(rng) * MUT_SIGMA;
-    }
-    return H.deserializeNet(arr);
+    for (let i = 0; i < arr.length; i++) if (rng() < MUT_PROB) arr[i] += H.gauss(rng) * MUT_SIGMA;
+    return H.deserializeNet(arr, net.nIn);
   }
 
   // pop: [{net, fitness}] -> net[] (elite primeiro, na ordem de fitness)
   function nextGeneration(pop, rng) {
+    const nIn = pop[0].net.nIn;
     const sorted = pop.slice().sort((a, b) => b.fitness - a.fitness);
-    const next = sorted.slice(0, ELITE).map(p => H.deserializeNet(H.serializeNet(p.net)));
+    const next = sorted.slice(0, ELITE).map(p => H.deserializeNet(H.serializeNet(p.net), nIn));
     while (next.length < POP_SIZE - RANDOM_NEW) next.push(mutate(tournament(sorted, rng).net, rng));
-    while (next.length < POP_SIZE) next.push(H.createNet(rng));
+    while (next.length < POP_SIZE) next.push(H.createNet(rng, nIn));
     return next;
   }
 
-  function act(net, drone, world) {
-    return H.forward(net, H.sensors(drone, world)).out;
+  function act(game, net, agent, world) {
+    return H.forward(net, game.sensors(agent, world)).out;
   }
 
-  // simula uma geração inteira sem desenhar; devolve as distâncias
-  function evaluate(nets, seed, maxSteps) {
-    const world = H.createWorld(seed);
-    const drones = nets.map(() => H.createDrone());
+  // simula uma geração inteira sem desenhar; devolve o fitness de cada rede
+  function evaluate(game, nets, seed, maxSteps, opts) {
+    const world = game.createWorld(seed, opts);
+    const agents = nets.map(() => game.createAgent(world));
     for (let s = 0; s < maxSteps; s++) {
-      H.stepWorld(world);
+      game.stepWorld(world);
       let alive = 0;
       for (let i = 0; i < nets.length; i++) {
-        const d = drones[i];
-        if (!d.alive) continue;
-        H.stepDrone(d, world, act(nets[i], d, world));
-        if (d.alive) alive++;
+        const a = agents[i];
+        if (!a.alive) continue;
+        game.stepAgent(a, world, act(game, nets[i], a, world));
+        if (a.alive) alive++;
       }
       if (!alive) break;
     }
-    return drones.map(d => d.distance);
+    return agents.map(game.fitness);
   }
 
   const api = { POP_SIZE, nextGeneration, evaluate, act };

@@ -72,6 +72,22 @@ with sync_playwright() as p:
     check('reset ignorado fora da tela de espera', pg.evaluate('__hvm.save.generation') == g1,
           f"{g1} -> {pg.evaluate('__hvm.save.generation')}")
 
+    # 6. troca de jogo (G) e de pista (T) na tela de espera; placares separados
+    pg.evaluate('localStorage.clear()'); pg.reload(); time.sleep(1)
+    g_before = pg.evaluate('__hvm.game')
+    pg.keyboard.press('KeyG'); time.sleep(0.5)
+    g_after = pg.evaluate('__hvm.game')
+    check('G troca de jogo', g_before != g_after, f'{g_before} -> {g_after}')
+    if g_after != 'race':
+        pg.keyboard.press('KeyG'); time.sleep(0.5)
+    t0 = pg.evaluate('__hvm.save.track'); pg.keyboard.press('KeyT'); time.sleep(0.5)
+    check('T troca de pista na corrida', pg.evaluate('__hvm.save.track') != t0)
+    pg.keyboard.press('Space'); time.sleep(3.5)
+    pg.keyboard.down('ArrowRight'); time.sleep(1.5); pg.keyboard.up('ArrowRight')
+    check('corrida: humano joga e bate', wait_mode(pg, ['RESULT_WAIT', 'RESULT', 'NAME', 'CARD'], 30))
+    pg.reload(); time.sleep(1)
+    check('jogo escolhido é lembrado ao recarregar', pg.evaluate('__hvm.game') == 'race')
+
     real = [e for e in errors if 'teste' not in e]
     check('sem erros de página', not real, real)
     b.close()

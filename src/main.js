@@ -2,64 +2,85 @@
   const H = window.HVM, R = H.Render, In = H.Input;
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
-  const STEP = 1 / 60, MAX_TICKS = 5, MAX_GEN_STEPS = 30000;
-  const SCORE_DIV = 10; // pontos = distância / 10
+  const STEP = 1 / 60, MAX_TICKS = 5;
   const ls = (() => { try { return window.localStorage; } catch (e) { return null; } })();
   const rng = H.makeRng((Date.now() ^ (Math.random() * 1e9)) >>> 0);
+  const GAMES = [H.Games.drone, H.Games.race];
+  const GAME_KEY = 'hvm.game';
 
   // ---------- estado ----------
-  const save = H.loadState(ls);
-  let nets = restorePopulation(save.population);
-  let world, drones, humanDrone = null, trail = [], genSteps = 0;
+  let gameIdx = 0;
+  try { gameIdx = Math.max(0, GAMES.findIndex(g => g.id === ls.getItem(GAME_KEY))); } catch (e) { /* padrão */ }
+  let game, save, nets;
+  let world, agents, human = null, trail = [], genSteps = 0;
   let mode = 'ATTRACT', modeT = 0, speedMul = 1;
   let result = null, nameEntry = null, toast = null;
   let cardIdx = Math.floor(rng() * 100), attractCard = null, attractCardT = 0;
 
+  const saveKey = g => 'hvm.v2.' + g.id;
+  const newPopulation = () => Array.from({ length: H.POP_SIZE }, () => H.createNet(rng, game.nInputs));
+
+  function loadGame(i) {
+    gameIdx = (i + GAMES.length) % GAMES.length;
+    game = GAMES[gameIdx];
+    save = H.loadState(ls, saveKey(game));
+    if (!Number.isInteger(save.track)) save.track = 0;
+    nets = restorePopulation(save.population);
+    try { ls.setItem(GAME_KEY, game.id); } catch (e) { /* sem storage */ }
+    startRun(false);
+  }
+
   function restorePopulation(pop) {
+    const n = H.nParams(game.nInputs);
     try {
-      if (Array.isArray(pop) && pop.length === H.POP_SIZE && pop.every(p => p.length === H.N_PARAMS)) {
-        return pop.map(H.deserializeNet);
+      if (Array.isArray(pop) && pop.length === H.POP_SIZE &&
+          pop.every(p => Array.isArray(p) && p.length === n && p.every(Number.isFinite))) {
+        return pop.map(p => H.deserializeNet(p, game.nInputs));
       }
     } catch (e) { /* cai para população nova */ }
-    return Array.from({ length: H.POP_SIZE }, () => H.createNet(rng));
+    return newPopulation();
   }
 
   function startRun(withHuman) {
-    world = H.createWorld((rng() * 4294967296) >>> 0);
-    drones = nets.map(() => H.createDrone());
-    humanDrone = withHuman ? H.createDrone() : null;
+    world = game.createWorld((rng() * 4294967296) >>> 0, { track: save.track });
+    agents = nets.map(() => game.createAgent(world));
+    human = withHuman ? game.createAgent(world) : null;
     trail = []; genSteps = 0;
   }
 
   function finishGeneration() {
-    const fit = drones.map(d => d.distance);
-    const best = Math.floor(Math.max(...fit) / SCORE_DIV);
+    const fit = agents.map(game.fitness);
+    const best = Math.max(...agents.map(game.score));
     if (best > save.bestMachine) save.bestMachine = best;
     nets = H.nextGeneration(nets.map((net, i) => ({ net, fitness: fit[i] })), rng);
     save.generation++;
     save.population = nets.map(H.serializeNet);
-    H.saveState(ls, save);
+    H.saveState(ls, save, saveKey(game));
     return best;
   }
 
-  function robotsAlive() { let n = 0; for (const d of drones) if (d.alive) n++; return n; }
+  function robotsAlive() { let n = 0; for (const a of agents) if (a.alive) n++; return n; }
 
   function bestAliveIdx() {
-    // a elite fica no começo do vetor: o primeiro vivo é o "melhor"
-    for (let i = 0; i < drones.length; i++) if (drones[i].alive) return i;
-    return -1;
+    let bi = -1, bf = -Infinity;
+    for (let i = 0; i < agents.length; i++) {
+      if (!agents[i].alive) continue;
+      const f = game.fitness(agents[i]) - i * 1e-6; // empate: a elite (começo do vetor) ganha
+      if (f > bf) { bf = f; bi = i; }
+    }
+    return bi;
   }
 
-  function stepSim(humanAxis) {
-    H.stepWorld(world);
+  function stepSim(humanAction) {
+    game.stepWorld(world);
     genSteps++;
-    for (let i = 0; i < drones.length; i++) {
-      const d = drones[i];
-      if (d.alive) H.stepDrone(d, world, H.act(nets[i], d, world));
+    for (let i = 0; i < agents.length; i++) {
+      const a = agents[i];
+      if (a.alive) game.stepAgent(a, world, H.act(game, nets[i], a, world));
     }
-    if (humanDrone && humanDrone.alive) {
-      H.stepDrone(humanDrone, world, humanAxis);
-      if (genSteps % 2 === 0) { trail.push(humanDrone.y); if (trail.length > 22) trail.shift(); }
+    if (human && human.alive) {
+      game.stepAgent(human, world, humanAction);
+      if (genSteps % 2 === 0) { trail.push(game.trailPoint(human)); if (trail.length > 22) trail.shift(); }
     }
   }
 
@@ -69,30 +90,42 @@
 
   // ---------- operador ----------
   In.onOperator(cmd => {
-    if (cmd === 'speed1') speedMul = 1;
-    if (cmd === 'speed5') speedMul = 5;
-    if (cmd === 'speed20') speedMul = 20;
     if (cmd === 'fullscreen') {
       if (document.fullscreenElement) document.exitFullscreen();
       else document.documentElement.requestFullscreen().catch(() => {});
+      return;
     }
-    if (cmd === 'reset' && mode !== 'ATTRACT') { showToast('reset só na tela de espera'); return; }
-    if (cmd === 'speed1' || cmd === 'speed5' || cmd === 'speed20') {
-      if (mode !== 'ATTRACT') { showToast('velocidade vale na tela de espera'); return; }
-    }
+    if (mode !== 'ATTRACT') { showToast('comandos do operador só na tela de espera'); return; }
+    if (cmd === 'speed1') speedMul = 1;
+    if (cmd === 'speed5') speedMul = 5;
+    if (cmd === 'speed20') speedMul = 20;
+    if (cmd.startsWith('speed')) showToast('treino ×' + speedMul);
     if (cmd === 'reset') {
       H.resetMachine(save);
-      nets = Array.from({ length: H.POP_SIZE }, () => H.createNet(rng));
-      H.saveState(ls, save);
-      if (mode === 'ATTRACT') startRun(false);
+      nets = newPopulation();
+      H.saveState(ls, save, saveKey(game));
+      startRun(false);
       showToast('IA resetada — começando do zero');
     }
-    if (speedMul > 1 && cmd.startsWith('speed')) showToast('treino ×' + speedMul);
+    if (cmd === 'game') {
+      H.saveState(ls, save, saveKey(game));
+      loadGame(gameIdx + 1);
+      showToast('jogo: ' + game.title);
+    }
+    if (cmd === 'track') {
+      if (!game.TRACKS) { showToast('este jogo não tem pistas'); return; }
+      save.track = (save.track + 1) % game.TRACKS.length;
+      H.saveState(ls, save, saveKey(game));
+      startRun(false);
+      showToast('pista nova: ' + game.TRACKS[save.track].name + ' — a IA nunca viu esta!');
+    }
   });
 
   // ---------- modos ----------
   const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   const NAME_TIMEOUT = 20; // segundos sem mexer na tela de nome
+
+  function humanAction(inp) { return game.axis === 'x' ? inp.axisX : inp.axis; }
 
   function update(ticks, inp) {
     const dt = ticks * STEP;
@@ -102,7 +135,7 @@
     if (mode === 'ATTRACT') {
       for (let k = 0; k < ticks * speedMul; k++) {
         stepSim(0);
-        if (!robotsAlive() || genSteps > MAX_GEN_STEPS) { finishGeneration(); startRun(false); }
+        if (!robotsAlive() || genSteps > game.maxSteps) { finishGeneration(); startRun(false); }
       }
       attractCardT += dt;
       if (attractCardT > 15) { attractCardT = 0; attractCard = attractCard ? null : nextCard(); }
@@ -111,17 +144,18 @@
       if (modeT >= 3) setMode('PLAYING');
     } else if (mode === 'PLAYING') {
       for (let k = 0; k < ticks; k++) {
-        stepSim(inp.axis);
-        if (!humanDrone.alive) break;
+        stepSim(humanAction(inp));
+        if (!human.alive || genSteps > game.maxSteps) break;
       }
-      if (!humanDrone.alive) {
-        result = { human: Math.floor(humanDrone.distance / SCORE_DIV), robot: null, gen: save.generation };
+      if (!human.alive || genSteps > game.maxSteps) {
+        human.alive = false;
+        result = { human: game.score(human), robot: null, gen: save.generation };
         setMode('RESULT_WAIT');
       }
     } else if (mode === 'RESULT_WAIT') {
-      // robôs que ainda voam terminam a corrida rapidinho
-      for (let k = 0; k < 60 && robotsAlive() && genSteps < MAX_GEN_STEPS; k++) stepSim(0);
-      if ((!robotsAlive() || genSteps >= MAX_GEN_STEPS) && modeT > 1) {
+      // robôs que ainda estão vivos terminam a corrida rapidinho
+      for (let k = 0; k < 60 && robotsAlive() && genSteps < game.maxSteps; k++) stepSim(0);
+      if ((!robotsAlive() || genSteps >= game.maxSteps) && modeT > 1) {
         result.robot = finishGeneration();
         setMode('RESULT');
       }
@@ -132,30 +166,24 @@
       }
     } else if (mode === 'NAME') {
       const ne = nameEntry;
-      if (inp.axis || Object.values(inp.pressed).some(Boolean)) ne.lastInput = modeT;
-      if (modeT - (ne.lastInput || 0) > NAME_TIMEOUT) {
-        // foi embora sem terminar: salva com o que estiver na tela
-        H.addHumanScore(save, ne.letters.map(i => LETTERS[i]).join(''), result.human);
-        H.saveState(ls, save);
-        goCard();
-        return;
-      }
+      if (inp.axis || inp.axisX || Object.values(inp.pressed).some(Boolean)) ne.lastInput = modeT;
+      if (modeT - (ne.lastInput || 0) > NAME_TIMEOUT) { saveName(); return; }
       if (inp.pressed.up) ne.letters[ne.pos] = (ne.letters[ne.pos] + LETTERS.length - 1) % LETTERS.length;
       if (inp.pressed.down) ne.letters[ne.pos] = (ne.letters[ne.pos] + 1) % LETTERS.length;
       if ((inp.pressed.b || inp.pressed.left) && ne.pos > 0) ne.pos--;
       if (inp.pressed.a || inp.pressed.right) {
-        if (ne.pos < 2) ne.pos++;
-        else {
-          H.addHumanScore(save, ne.letters.map(i => LETTERS[i]).join(''), result.human);
-          H.saveState(ls, save);
-          goCard();
-        }
+        if (ne.pos < 2) ne.pos++; else saveName();
       }
     } else if (mode === 'CARD') {
       if (modeT > 8 || (modeT > 1.5 && inp.pressed.a)) toAttract();
     }
   }
 
+  function saveName() {
+    H.addHumanScore(save, nameEntry.letters.map(i => LETTERS[i]).join(''), result.human);
+    H.saveState(ls, save, saveKey(game));
+    goCard();
+  }
   function goCard() {
     result.card = nextCard();
     if (result.card) setMode('CARD'); else toAttract();
@@ -165,29 +193,26 @@
   // ---------- desenho ----------
   function draw(inp) {
     const C = R.C;
-    R.background(ctx, world);
-    R.obstacles(ctx, world);
     const bi = bestAliveIdx();
-    R.robots(ctx, drones, bi);
-    if (humanDrone) R.human(ctx, humanDrone, trail);
+    if (bi >= 0) game.sensors(agents[bi], world); // atualiza os raios para desenhar
+    game.draw(ctx, world, agents, bi, human, trail, C);
 
-    const playing = mode === 'PLAYING' || mode === 'COUNTDOWN';
-    R.hud(ctx, {
-      bestHuman: H.bestHuman(save), bestMachine: save.bestMachine,
-      score: humanDrone ? Math.floor(humanDrone.distance / SCORE_DIV) : null,
-    });
+    R.hud(ctx, { bestHuman: H.bestHuman(save), bestMachine: save.bestMachine, score: human ? game.score(human) : null });
     R.panel(ctx, {
-      generation: save.generation, alive: robotsAlive(), total: drones.length,
+      title: game.title + (game.TRACKS ? ' · ' + game.TRACKS[save.track].name : ''),
+      generation: save.generation, alive: robotsAlive(), total: agents.length,
       speedMul: mode === 'ATTRACT' ? speedMul : 1,
-      net: bi >= 0 ? nets[bi] : null, inputs: bi >= 0 ? H.sensors(drones[bi], world) : null,
+      net: bi >= 0 ? nets[bi] : null, inputs: bi >= 0 ? game.sensors(agents[bi], world) : null,
+      labels: game.inputLabels,
+      outLabel: o => (game.axis === 'x' ? (o < 0 ? '◀' : '▶') : (o < 0 ? '▲' : '▼')),
       humans: save.humans, padName: In.connectedName(),
     });
 
     if (mode === 'ATTRACT') {
       const blink = Math.floor(modeT * 2) % 2 === 0;
       R.center(ctx, [
-        { s: 'HUMANOS vs. MÁQUINA', size: 54, weight: 900 },
-        { s: 'os robôs rosa estão aprendendo sozinhos a desviar', size: 22, color: C.dim, weight: 500 },
+        { s: 'HUMANOS vs. MÁQUINA', size: 54, weight: 900, shadow: true },
+        { s: 'os robôs rosa estão aprendendo sozinhos — geração ' + save.generation, size: 22, color: '#c9d0f0', weight: 600, shadow: true },
       ]);
       if (blink) R.text(ctx, 'APERTE QUALQUER BOTÃO PARA DESAFIAR A MÁQUINA', R.GW / 2, R.GH - 60, 26, C.human, 'center', 800);
       if (attractCard) R.card(ctx, attractCard, 24, 70, 420, true);
@@ -195,13 +220,13 @@
       R.overlay(ctx, 0.35);
       R.center(ctx, [
         { s: String(3 - Math.floor(modeT)), size: 120, color: C.human, weight: 900 },
-        { s: 'você é o drone AMARELO — ▲ ▼ para desviar', size: 26 },
+        { s: 'você é o AMARELO — ' + game.hint, size: 26 },
       ]);
     } else if (mode === 'RESULT_WAIT') {
       R.overlay(ctx, 0.55);
       R.center(ctx, [
         { s: 'Você fez ' + result.human + ' pontos', size: 46, color: C.human, weight: 900 },
-        { s: robotsAlive() ? robotsAlive() + ' robôs ainda voando…' : 'contando…', size: 24, color: C.dim },
+        { s: robotsAlive() ? robotsAlive() + ' robôs ainda na disputa…' : 'contando…', size: 24, color: C.dim },
       ]);
     } else if (mode === 'RESULT') {
       R.overlay(ctx, 0.7);
@@ -210,7 +235,7 @@
         { s: 'Você fez ' + result.human + ' pontos', size: 46, color: C.human, weight: 900 },
         { s: 'O melhor robô da geração ' + result.gen + ' fez ' + result.robot, size: 30, color: 'rgb(' + C.robot + ')' },
         { s: win ? 'Você venceu a máquina! 🎉' : 'A máquina venceu… por enquanto.', size: 36, weight: 800 },
-        { s: win ? 'Mas ela continua aprendendo a cada geração.' : 'Ninguém programou como ela desvia: ela aprendeu.', size: 20, color: C.dim, weight: 500 },
+        { s: win ? 'Mas ela continua aprendendo a cada geração.' : 'Ninguém programou como ela joga: ela aprendeu.', size: 20, color: C.dim, weight: 500 },
       ]);
     } else if (mode === 'NAME') {
       R.overlay(ctx, 0.8);
@@ -231,14 +256,15 @@
 
     if (toast) R.text(ctx, toast.s, R.GW / 2, 90, 24, C.human, 'center', 800);
     if (DEBUG_INPUT) {
-      R.text(ctx, 'debug: ' + JSON.stringify({ axis: inp.axis.toFixed(2), pad: In.connectedName(), held: inp.pressed }), 10, R.GH - 14, 13, '#0f0');
+      R.text(ctx, 'debug: ' + JSON.stringify({ y: inp.axis.toFixed(2), x: (inp.axisX || 0).toFixed(2), pad: In.connectedName(), held: inp.pressed }), 10, R.GH - 14, 13, '#0f0');
     }
   }
 
   // ---------- loop ----------
   const DEBUG_INPUT = /debug=input/.test(location.search);
   let last = performance.now(), acc = 0;
-  startRun(false);
+  let lastInp = { axis: 0, axisX: 0, pressed: {}, any: false };
+  loadGame(gameIdx);
   function frame(now) {
     acc += Math.min(0.25, (now - last) / 1000);
     last = now;
@@ -254,7 +280,6 @@
       console.error(e);
     }
   }
-  let lastInp = { axis: 0, pressed: {}, any: false };
 
   // mantém a tela acesa no stand
   function keepAwake() {
@@ -264,5 +289,8 @@
   document.addEventListener('visibilitychange', () => { if (!document.hidden) keepAwake(); });
   addEventListener('keydown', keepAwake, { once: true });
   requestAnimationFrame(frame);
-  window.__hvm = { get mode() { return mode; }, save, setSpeed: m => (speedMul = m) };
+  window.__hvm = {
+    get mode() { return mode; }, get save() { return save; }, get game() { return game.id; },
+    setSpeed: m => (speedMul = m),
+  };
 })();

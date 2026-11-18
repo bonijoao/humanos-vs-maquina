@@ -50,6 +50,16 @@ test('qualifies diz se a pontuação entra no top 5', () => {
   assert.strictEqual(S.qualifies(s, 150), true);
 });
 
+test('cada jogo tem sua própria chave de armazenamento', () => {
+  const st = mem();
+  const a = S.defaultState(); a.generation = 5;
+  const b = S.defaultState(); b.generation = 9;
+  S.saveState(st, a, 'hvm.v2.drone');
+  S.saveState(st, b, 'hvm.v2.race');
+  assert.strictEqual(S.loadState(st, 'hvm.v2.drone').generation, 5);
+  assert.strictEqual(S.loadState(st, 'hvm.v2.race').generation, 9);
+});
+
 test('resetMachine zera a máquina e mantém humanos', () => {
   const s = S.defaultState();
   s.generation = 9; s.bestMachine = 1000; s.population = [[1]];
