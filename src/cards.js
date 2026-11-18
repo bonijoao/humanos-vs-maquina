@@ -6,7 +6,9 @@
     { tag: 'agora', title: 'Isso é seleção natural',
       body: 'A cada geração, os robôs que foram mais longe viram "pais" da próxima, com pequenas mutações. É um algoritmo genético: a ideia de Darwin aplicada a programas.' },
     { tag: 'agora', title: 'O cérebro do robô',
-      body: 'O desenho ao lado é uma rede neural: 6 sensores (altura, distância da parede...) ligados a 6 neurônios que decidem subir ou descer. São só 49 números, que a evolução vai ajustando.' },
+      body: 'O desenho ao lado é uma rede neural: 7 "raios" que medem a distância até a parede, mais a velocidade, ligados a 8 neurônios que decidem para onde ir. São só 81 números, que a evolução vai ajustando.' },
+    { tag: 'agora', title: 'Os raios rosa',
+      body: 'O robô não vê a tela como você. Ele só sabe a que distância está a parede em 7 direções — igual aos sensores de ré de um carro ou ao lidar de um carro autônomo.' },
     { tag: 'agora', title: 'Por que ele ainda erra?',
       body: 'A máquina só aprende com o que viu. Quando o jogo fica rápido demais ou aparece uma situação nova, ela erra. Toda IA tem esse limite, inclusive as grandes.' },
     // no mundo real
