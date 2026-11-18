@@ -18,6 +18,11 @@ TECLAS SÓ PARA VOCÊS (teclado do notebook)
                          para eles verem a máquina "nascer burra" e aprender
   F          tela cheia liga/desliga
 
+ANTES DE SAIR DE CASA
+  Configurações do Windows > Sistema > Energia: na tomada, tela e suspensão
+  em "Nunca". (O jogo pede para a tela não apagar, mas o controle sozinho
+  não conta como "uso" para o Windows.) Leve o carregador do controle.
+
 DICAS PARA O STAND
   - Com ×20, a IA fica boa em ~1 minuto. Com ×1, em ~3–5 minutos.
   - Depois de uns 5 minutos treinando, quase ninguém ganha da máquina.

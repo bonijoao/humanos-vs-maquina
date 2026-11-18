@@ -76,6 +76,10 @@
       if (document.fullscreenElement) document.exitFullscreen();
       else document.documentElement.requestFullscreen().catch(() => {});
     }
+    if (cmd === 'reset' && mode !== 'ATTRACT') { showToast('reset só na tela de espera'); return; }
+    if (cmd === 'speed1' || cmd === 'speed5' || cmd === 'speed20') {
+      if (mode !== 'ATTRACT') { showToast('velocidade vale na tela de espera'); return; }
+    }
     if (cmd === 'reset') {
       H.resetMachine(save);
       nets = Array.from({ length: H.POP_SIZE }, () => H.createNet(rng));
@@ -88,6 +92,7 @@
 
   // ---------- modos ----------
   const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  const NAME_TIMEOUT = 20; // segundos sem mexer na tela de nome
 
   function update(ticks, inp) {
     const dt = ticks * STEP;
@@ -127,6 +132,14 @@
       }
     } else if (mode === 'NAME') {
       const ne = nameEntry;
+      if (inp.axis || Object.values(inp.pressed).some(Boolean)) ne.lastInput = modeT;
+      if (modeT - (ne.lastInput || 0) > NAME_TIMEOUT) {
+        // foi embora sem terminar: salva com o que estiver na tela
+        H.addHumanScore(save, ne.letters.map(i => LETTERS[i]).join(''), result.human);
+        H.saveState(ls, save);
+        goCard();
+        return;
+      }
       if (inp.pressed.up) ne.letters[ne.pos] = (ne.letters[ne.pos] + LETTERS.length - 1) % LETTERS.length;
       if (inp.pressed.down) ne.letters[ne.pos] = (ne.letters[ne.pos] + 1) % LETTERS.length;
       if ((inp.pressed.b || inp.pressed.left) && ne.pos > 0) ne.pos--;
@@ -232,11 +245,24 @@
     let ticks = 0;
     while (acc >= STEP && ticks < MAX_TICKS) { acc -= STEP; ticks++; }
     if (ticks === MAX_TICKS) acc = 0; // aba voltou do segundo plano: descarta o atraso
-    const inp = In.poll();
-    if (ticks) update(ticks, inp);
-    draw(inp);
-    requestAnimationFrame(frame);
+    requestAnimationFrame(frame); // agenda antes: um erro num quadro não mata o loop
+    try {
+      // só lê a entrada quando vai simular, senão toques são consumidos e perdidos
+      if (ticks) { lastInp = In.poll(); update(ticks, lastInp); }
+      draw(lastInp);
+    } catch (e) {
+      console.error(e);
+    }
   }
+  let lastInp = { axis: 0, pressed: {}, any: false };
+
+  // mantém a tela acesa no stand
+  function keepAwake() {
+    try { if (navigator.wakeLock) navigator.wakeLock.request('screen').catch(() => {}); } catch (e) { /* sem suporte */ }
+  }
+  keepAwake();
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) keepAwake(); });
+  addEventListener('keydown', keepAwake, { once: true });
   requestAnimationFrame(frame);
   window.__hvm = { get mode() { return mode; }, save, setSpeed: m => (speedMul = m) };
 })();
