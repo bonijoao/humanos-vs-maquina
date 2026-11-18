@@ -3,7 +3,8 @@ const assert = require('node:assert');
 const { makeRng } = require('../src/rng.js');
 const NN = require('../src/nn.js');
 const GA = require('../src/ga.js');
-const GAMES = { drone: require('../src/games/drone.js'), race: require('../src/games/race.js') };
+const GAMES = { drone: require('../src/games/drone.js') };
+const RACE = require('../src/games/race.js');
 
 test('nextGeneration devolve 50 redes e mantém as 5 melhores', () => {
   const rng = makeRng(10);
@@ -37,3 +38,35 @@ for (const [id, game] of Object.entries(GAMES)) {
     assert.ok(best[3] < 0.6 * best[20], 'não domina cedo: ' + msg);
   });
 }
+
+// Corrida: bater só freia, então o que mostra a evolução é QUANTOS robôs terminam
+// as 3 voltas e o tempo caindo. Na 1ª geração quase ninguém termina.
+test('race: poucos terminam na geração 1; muitos terminam na 10, com tempo menor (mediana de 3 sementes)', () => {
+  const runs = [11, 22, 33].map(seed => {
+    const rng = makeRng(seed);
+    let nets = Array.from({ length: GA.POP_SIZE }, () => NN.createNet(rng, RACE.nInputs));
+    const r = {};
+    for (let g = 1; g <= 10; g++) {
+      const world = RACE.createWorld(seed * 1000 + g, { track: 0 });
+      const agents = nets.map(() => RACE.createAgent(world));
+      for (let s = 0; s < RACE.maxSteps; s++) {
+        RACE.stepWorld(world);
+        let alive = 0;
+        agents.forEach((a, i) => { if (a.alive) { RACE.stepAgent(a, world, GA.act(RACE, nets[i], a, world)); if (a.alive) alive++; } });
+        if (!alive) break;
+      }
+      const times = agents.map(RACE.score).filter(t => t !== null);
+      r[g] = { fin: times.length, best: times.length ? Math.min(...times) : Infinity };
+      const fit = agents.map(RACE.fitness);
+      nets = GA.nextGeneration(nets.map((net, i) => ({ net, fitness: fit[i] })), rng);
+    }
+    return r;
+  });
+  const med = f => runs.map(f).sort((a, b) => a - b)[1];
+  const fin1 = med(r => r[1].fin), fin10 = med(r => r[10].fin);
+  const t1 = med(r => r[1].best), t10 = med(r => r[10].best);
+  const msg = `fin1=${fin1} fin10=${fin10} t1=${t1} t10=${t10}`;
+  assert.ok(fin1 <= 10, 'poucos no começo: ' + msg);
+  assert.ok(fin10 >= 3 * Math.max(1, fin1), 'muitos depois: ' + msg);
+  assert.ok(t10 < t1, 'tempo cai: ' + msg);
+});

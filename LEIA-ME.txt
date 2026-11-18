@@ -7,26 +7,25 @@ COMO ABRIR
   Ligue o controle ANTES ou depois, tanto faz — mas aperte um botão dele
   com a página aberta para o Chrome "acordar" o controle.
 
-OS DOIS JOGOS (troque com a tecla G na tela de espera)
-  NAVE     Desvie das colunas. Tem gravidade: segure ▲ para subir.
-           Colunas LARANJA se mexem. Os robôs enxergam com 7 raios.
-  CORRIDA  Carrinho visto de cima, acelera sozinho e fica cada vez mais rápido.
-           ◀ ▶ para virar. Os robôs enxergam a borda da pista com 7 raios.
-           3 pistas (tecla T). A IA treinada numa pista tenta correr numa
-           pista que nunca viu: ótimo para falar de "generalização".
+OS DOIS JOGOS
+  Na tela de espera, use o CONTROLE:  ◀ ▶ troca o jogo,  ▲ ▼ troca a pista.
+  NAVE     Desvie das colunas. Segure ▲ para subir (tem gravidade leve).
+           Colunas LARANJA se mexem. Bateu, acabou. Vale a distância.
+  CORRIDA  3 voltas contra o relógio, vale o MENOR TEMPO. Bater na parede só
+           freia (ninguém é eliminado). Limite de 45 s por corrida.
+           5 pistas. A mesma IA corre em todas: trocar de pista mostra como ela
+           se vira num lugar que nunca viu ("generalização").
   Cada jogo tem sua própria IA e seu próprio placar.
 
 COMO JOGA
   Qualquer botão do controle (ou Espaço) começa a partida.
-  Analógico / direcional (ou setas). Você é o AMARELO; os ROSA são a IA.
-  Os riscos rosa saindo do melhor robô são os raios: o que ele "enxerga".
+  Você é o AMARELO; os ROSA são a IA. Os riscos rosa saindo do melhor robô
+  são os raios: o que ele "enxerga". Carro laranja = acabou de bater.
 
 TECLAS SÓ PARA VOCÊS (teclado do notebook, só na tela de espera)
   1 / 2 / 3  velocidade do treino: ×1 / ×5 / ×20
-  R (segure 2 segundos)  reseta a IA do jogo atual — quando chegar turma nova,
-                         para eles verem a máquina "nascer burra" e aprender
-  G          troca de jogo (nave / corrida)
-  T          troca de pista (só na corrida)
+  R (segure 2 segundos)  reseta a IA do jogo atual — quando chegar turma nova
+  G / T      troca de jogo / de pista (o mesmo que ◀ ▶ / ▲ ▼ no controle)
   F          tela cheia liga/desliga
 
 ANTES DE SAIR DE CASA
@@ -35,9 +34,10 @@ ANTES DE SAIR DE CASA
   não conta como "uso" para o Windows.) Leve o carregador do controle.
 
 DICAS PARA O STAND
-  - Em ×1, a geração 1 bate logo; a máquina leva uns 3–5 min para ganhar de
-    um iniciante e continua melhorando por uns 15 min. Em ×20, tudo isso em
-    menos de 1 minuto.
+  - NAVE: na geração 1 os robôs batem logo; em ×1 levam uns 5–10 min para
+    ficar bons. CORRIDA: na geração 1 quase nenhum carro termina; por volta da
+    geração 10 (uns 7 min em ×1) quase todos terminam, e o tempo vai caindo.
+    Em ×20 tudo isso acontece em menos de 1 minuto.
   - Roteiro: R (reset) com a turma olhando → deixar uns minutos em ×1 → chamar
     alguém para jogar → T (pista nova) para ver a IA se virar no desconhecido.
   - Placar e IA ficam salvos no navegador. Para zerar tudo: F12 > Console >

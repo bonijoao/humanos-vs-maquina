@@ -17,7 +17,7 @@
   let result = null, nameEntry = null, toast = null;
   let cardIdx = Math.floor(rng() * 100), attractCard = null, attractCardT = 0;
 
-  const saveKey = g => 'hvm.v2.' + g.id;
+  const saveKey = g => 'hvm.v3.' + g.id; // v3: regras novas (nave mais fácil, corrida por tempo)
   const newPopulation = () => Array.from({ length: H.POP_SIZE }, () => H.createNet(rng, game.nInputs));
 
   function loadGame(i) {
@@ -44,20 +44,29 @@
   function startRun(withHuman) {
     world = game.createWorld((rng() * 4294967296) >>> 0, { track: save.track });
     agents = nets.map(() => game.createAgent(world));
-    human = withHuman ? game.createAgent(world) : null;
+    human = withHuman ? game.createAgent(world, { human: true }) : null;
     trail = []; genSteps = 0;
   }
 
   function finishGeneration() {
     const fit = agents.map(game.fitness);
-    const best = Math.max(...agents.map(game.score));
-    if (best > save.bestMachine) save.bestMachine = best;
+    const best = bestScore(agents.map(game.score));
+    if (best !== null && (!save.bestMachine || better(best, save.bestMachine))) save.bestMachine = best;
     nets = H.nextGeneration(nets.map((net, i) => ({ net, fitness: fit[i] })), rng);
     save.generation++;
     save.population = nets.map(H.serializeNet);
     H.saveState(ls, save, saveKey(game));
     return best;
   }
+
+  // placar: na corrida vale o MENOR tempo; null = não terminou
+  const asc = () => !!game.lowerIsBetter;
+  const better = (a, b) => (asc() ? a < b : a > b);
+  function bestScore(list) {
+    const ok = list.filter(s => s !== null && Number.isFinite(s) && s > 0);
+    return ok.length ? (asc() ? Math.min(...ok) : Math.max(...ok)) : null;
+  }
+  const fmt = s => (game.formatScore ? game.formatScore(s) : String(s || 0));
 
   function robotsAlive() { let n = 0; for (const a of agents) if (a.alive) n++; return n; }
 
@@ -139,6 +148,17 @@
       }
       attractCardT += dt;
       if (attractCardT > 15) { attractCardT = 0; attractCard = attractCard ? null : nextCard(); }
+      if (inp.pressed.left || inp.pressed.right) {
+        H.saveState(ls, save, saveKey(game));
+        loadGame(gameIdx + (inp.pressed.right ? 1 : -1));
+        showToast('jogo: ' + game.title);
+      } else if (game.TRACKS && (inp.pressed.up || inp.pressed.down)) {
+        const n = game.TRACKS.length;
+        save.track = (save.track + (inp.pressed.down ? 1 : n - 1)) % n;
+        H.saveState(ls, save, saveKey(game));
+        startRun(false);
+        showToast('pista: ' + game.TRACKS[save.track].name);
+      }
       if (inp.any && modeT > 0.4) { startRun(true); attractCard = null; setMode('COUNTDOWN'); }
     } else if (mode === 'COUNTDOWN') {
       if (modeT >= 3) setMode('PLAYING');
@@ -149,7 +169,7 @@
       }
       if (!human.alive || genSteps > game.maxSteps) {
         human.alive = false;
-        result = { human: game.score(human), robot: null, gen: save.generation };
+        result = { human: game.score(human), laps: human.laps, robot: null, gen: save.generation };
         setMode('RESULT_WAIT');
       }
     } else if (mode === 'RESULT_WAIT') {
@@ -161,7 +181,7 @@
       }
     } else if (mode === 'RESULT') {
       if (modeT > 5 || (modeT > 1 && inp.pressed.a)) {
-        if (H.qualifies(save, result.human)) { nameEntry = { letters: [0, 0, 0], pos: 0 }; setMode('NAME'); }
+        if (H.qualifies(save, result.human, asc())) { nameEntry = { letters: [0, 0, 0], pos: 0 }; setMode('NAME'); }
         else goCard();
       }
     } else if (mode === 'NAME') {
@@ -180,7 +200,7 @@
   }
 
   function saveName() {
-    H.addHumanScore(save, nameEntry.letters.map(i => LETTERS[i]).join(''), result.human);
+    H.addHumanScore(save, nameEntry.letters.map(i => LETTERS[i]).join(''), result.human, asc());
     H.saveState(ls, save, saveKey(game));
     goCard();
   }
@@ -197,7 +217,7 @@
     if (bi >= 0) game.sensors(agents[bi], world); // atualiza os raios para desenhar
     game.draw(ctx, world, agents, bi, human, trail, C);
 
-    R.hud(ctx, { bestHuman: H.bestHuman(save), bestMachine: save.bestMachine, score: human ? game.score(human) : null });
+    R.hud(ctx, { bestHuman: fmt(H.bestHuman(save) || null), bestMachine: fmt(save.bestMachine || null), score: human ? (game.hudText ? game.hudText(human) : String(game.score(human))) : null });
     R.panel(ctx, {
       title: game.title + (game.TRACKS ? ' · ' + game.TRACKS[save.track].name : ''),
       generation: save.generation, alive: robotsAlive(), total: agents.length,
@@ -205,7 +225,7 @@
       net: bi >= 0 ? nets[bi] : null, inputs: bi >= 0 ? game.sensors(agents[bi], world) : null,
       labels: game.inputLabels,
       outLabel: o => (game.axis === 'x' ? (o < 0 ? '◀' : '▶') : (o < 0 ? '▲' : '▼')),
-      humans: save.humans, padName: In.connectedName(),
+      humans: save.humans.map(h => ({ name: h.name, score: fmt(h.score) })), padName: In.connectedName(),
     });
 
     if (mode === 'ATTRACT') {
@@ -214,7 +234,8 @@
         { s: 'HUMANOS vs. MÁQUINA', size: 54, weight: 900, shadow: true },
         { s: 'os robôs rosa estão aprendendo sozinhos — geração ' + save.generation, size: 22, color: '#c9d0f0', weight: 600, shadow: true },
       ]);
-      if (blink) R.text(ctx, 'APERTE QUALQUER BOTÃO PARA DESAFIAR A MÁQUINA', R.GW / 2, R.GH - 60, 26, C.human, 'center', 800);
+      if (blink) R.text(ctx, 'APERTE QUALQUER BOTÃO PARA DESAFIAR A MÁQUINA', R.GW / 2, R.GH - 42, 26, C.human, 'center', 800);
+      drawSelector(C);
       if (attractCard) R.card(ctx, attractCard, 24, 70, 420, true);
     } else if (mode === 'COUNTDOWN') {
       R.overlay(ctx, 0.35);
@@ -225,16 +246,18 @@
     } else if (mode === 'RESULT_WAIT') {
       R.overlay(ctx, 0.55);
       R.center(ctx, [
-        { s: 'Você fez ' + result.human + ' pontos', size: 46, color: C.human, weight: 900 },
+        { s: humanLine(), size: 46, color: C.human, weight: 900 },
         { s: robotsAlive() ? robotsAlive() + ' robôs ainda na disputa…' : 'contando…', size: 24, color: C.dim },
       ]);
     } else if (mode === 'RESULT') {
       R.overlay(ctx, 0.7);
-      const win = result.human > result.robot;
+      const win = result.human !== null && (result.robot === null || better(result.human, result.robot));
+      const tie = result.human === null && result.robot === null;
       R.center(ctx, [
-        { s: 'Você fez ' + result.human + ' pontos', size: 46, color: C.human, weight: 900 },
-        { s: 'O melhor robô da geração ' + result.gen + ' fez ' + result.robot, size: 30, color: 'rgb(' + C.robot + ')' },
-        { s: win ? 'Você venceu a máquina! 🎉' : 'A máquina venceu… por enquanto.', size: 36, weight: 800 },
+        { s: humanLine(), size: 46, color: C.human, weight: 900 },
+        { s: result.robot === null ? 'Nenhum robô da geração ' + result.gen + ' terminou'
+            : 'O melhor robô da geração ' + result.gen + ' fez ' + robotFmt(result.robot), size: 30, color: 'rgb(' + C.robot + ')' },
+        { s: tie ? 'Empate: ninguém completou!' : win ? 'Você venceu a máquina! 🎉' : 'A máquina venceu… por enquanto.', size: 36, weight: 800 },
         { s: win ? 'Mas ela continua aprendendo a cada geração.' : 'Ninguém programou como ela joga: ela aprendeu.', size: 20, color: C.dim, weight: 500 },
       ]);
     } else if (mode === 'NAME') {
@@ -258,6 +281,25 @@
     if (DEBUG_INPUT) {
       R.text(ctx, 'debug: ' + JSON.stringify({ y: inp.axis.toFixed(2), x: (inp.axisX || 0).toFixed(2), pad: In.connectedName(), held: inp.pressed }), 10, R.GH - 14, 13, '#0f0');
     }
+  }
+
+  function humanLine() {
+    if (asc()) return result.human === null ? 'Você completou ' + result.laps + ' de ' + game.LAPS + ' voltas' : 'Seu tempo: ' + fmt(result.human);
+    return 'Você fez ' + result.human + ' pontos';
+  }
+  const robotFmt = s => (asc() ? fmt(s) : s + ' pontos');
+
+  function drawSelector(C) {
+    const y = R.GH - 150;
+    ctx.fillStyle = 'rgba(5,6,15,0.75)'; ctx.fillRect(R.GW / 2 - 300, y - 26, 600, game.TRACKS ? 82 : 52);
+    R.text(ctx, '◀', R.GW / 2 - 280, y, 24, C.dim, 'center', 800);
+    R.text(ctx, '▶', R.GW / 2 + 280, y, 24, C.dim, 'center', 800);
+    GAMES.forEach((g, i) => {
+      const x = R.GW / 2 + (i - (GAMES.length - 1) / 2) * 220;
+      R.text(ctx, g.title, x, y, 26, i === gameIdx ? C.human : C.dim, 'center', 900);
+      if (i === gameIdx) { ctx.fillStyle = C.human; ctx.fillRect(x - 60, y + 16, 120, 4); }
+    });
+    if (game.TRACKS) R.text(ctx, '▲ ▼  pista ' + (save.track + 1) + '/' + game.TRACKS.length + ': ' + game.TRACKS[save.track].name, R.GW / 2, y + 38, 18, C.text, 'center', 600);
   }
 
   // ---------- loop ----------

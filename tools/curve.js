@@ -26,7 +26,8 @@ for (let seed = 1; seed <= SEEDS; seed++) {
     }
     steps += s;
     const fit = agents.map(game.fitness);
-    const best = Math.max(...agents.map(game.score));
+    const sc = agents.map(game.score).filter(s => s !== null);
+    const best = game.lowerIsBetter ? (sc.length ? Math.min(...sc) + "s(" + sc.length + "fin)" : "dnf:" + Math.max(...agents.map(a => a.laps || 0)) + "v") : Math.max(...sc);
     if (g <= 5 || g % 5 === 0) out.push(`g${g}:${best}@${Math.round(steps / 60)}s`);
     nets = GA.nextGeneration(nets.map((net, i) => ({ net, fitness: fit[i] })), rng);
   }

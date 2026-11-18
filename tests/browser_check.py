@@ -1,5 +1,6 @@
 """Testes de navegador (Playwright + Chrome). Rodar: python -I tests/browser_check.py"""
 import sys, time, pathlib
+sys.stdout.reconfigure(encoding="utf-8")
 from playwright.sync_api import sync_playwright
 
 URL = pathlib.Path(__file__).resolve().parent.parent.joinpath('index.html').as_uri()
@@ -83,8 +84,15 @@ with sync_playwright() as p:
     t0 = pg.evaluate('__hvm.save.track'); pg.keyboard.press('KeyT'); time.sleep(0.5)
     check('T troca de pista na corrida', pg.evaluate('__hvm.save.track') != t0)
     pg.keyboard.press('Space'); time.sleep(3.5)
-    pg.keyboard.down('ArrowRight'); time.sleep(1.5); pg.keyboard.up('ArrowRight')
-    check('corrida: humano joga e bate', wait_mode(pg, ['RESULT_WAIT', 'RESULT', 'NAME', 'CARD'], 30))
+    pg.keyboard.down('ArrowRight'); time.sleep(3); pg.keyboard.up('ArrowRight')
+    check('corrida: bater na parede não acaba a corrida', pg.evaluate('__hvm.mode') == 'PLAYING')
+    check('corrida: termina sozinha no tempo limite', wait_mode(pg, ['RESULT_WAIT', 'RESULT', 'NAME', 'CARD'], 60))
+    wait_mode(pg, ['ATTRACT'], 40)
+    g1 = pg.evaluate('__hvm.game'); pg.keyboard.press('ArrowLeft'); time.sleep(0.5)
+    check('◀ ▶ na tela de espera troca de jogo (controle)', pg.evaluate('__hvm.game') != g1)
+    pg.keyboard.press('ArrowRight'); time.sleep(0.5)
+    tr = pg.evaluate('__hvm.save.track'); pg.keyboard.press('ArrowDown'); time.sleep(0.5)
+    check('▲ ▼ na tela de espera troca de pista', pg.evaluate('__hvm.save.track') != tr)
     pg.reload(); time.sleep(1)
     check('jogo escolhido é lembrado ao recarregar', pg.evaluate('__hvm.game') == 'race')
 

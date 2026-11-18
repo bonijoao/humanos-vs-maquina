@@ -50,6 +50,17 @@ test('qualifies diz se a pontuação entra no top 5', () => {
   assert.strictEqual(S.qualifies(s, 150), true);
 });
 
+test('placar de tempo: menor é melhor', () => {
+  const s = S.defaultState();
+  [30.5, 25.1, 40.2, 28.0, 35.3].forEach((v, i) => S.addHumanScore(s, 'P' + i, v, true));
+  assert.deepStrictEqual(S.addHumanScore(s, 'NEW', 26.0, true), { rank: 2 });
+  assert.strictEqual(S.qualifies(s, 50, true), false);
+  assert.strictEqual(S.qualifies(s, 29, true), true);
+  assert.deepStrictEqual(s.humans.map(h => h.score), [25.1, 26.0, 28.0, 30.5, 35.3]);
+  assert.strictEqual(S.bestHuman(s), 25.1);
+  assert.strictEqual(S.qualifies(S.defaultState(), null, true), false); // não terminou
+});
+
 test('cada jogo tem sua própria chave de armazenamento', () => {
   const st = mem();
   const a = S.defaultState(); a.generation = 5;

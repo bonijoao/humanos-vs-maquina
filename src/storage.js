@@ -27,15 +27,19 @@
     try { storage && storage.setItem(key || KEY, JSON.stringify(state)); } catch (e) { /* sem espaço/bloqueado */ }
   }
 
-  function qualifies(state, score) {
-    return score > 0 && (state.humans.length < TOP || score > state.humans[TOP - 1].score);
+  // asc = true: placar de tempo (menor é melhor); score null = não terminou
+  function qualifies(state, score, asc) {
+    if (!Number.isFinite(score) || score <= 0) return false;
+    if (state.humans.length < TOP) return true;
+    const last = state.humans[TOP - 1].score;
+    return asc ? score < last : score > last;
   }
 
-  function addHumanScore(state, name, score) {
-    if (!qualifies(state, score)) return { rank: null };
+  function addHumanScore(state, name, score, asc) {
+    if (!qualifies(state, score, asc)) return { rank: null };
     const entry = { name, score, date: new Date().toISOString().slice(0, 10) };
     state.humans.push(entry);
-    state.humans.sort((a, b) => b.score - a.score);
+    state.humans.sort((a, b) => (asc ? a.score - b.score : b.score - a.score));
     state.humans.length = Math.min(state.humans.length, TOP);
     return { rank: state.humans.indexOf(entry) + 1 };
   }
