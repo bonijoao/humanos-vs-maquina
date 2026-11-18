@@ -1,0 +1,5 @@
+{
+  "name": "humanos-vs-maquina",
+  "private": true,
+  "scripts": { "test": "node --test \"tests/*.test.js\"" }
+}
