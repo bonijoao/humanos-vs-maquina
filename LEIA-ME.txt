@@ -1,0 +1,32 @@
+HUMANOS vs. MÁQUINA
+===================
+
+COMO ABRIR
+  Dê dois cliques em index.html (abre no Chrome). Aperte F para tela cheia.
+  Não precisa de internet.
+  Ligue o controle ANTES ou depois, tanto faz — mas aperte um botão dele
+  com a página aberta para o Chrome "acordar" o controle.
+
+COMO JOGA
+  Qualquer botão do controle (ou Espaço) começa a partida.
+  Analógico / direcional para cima e para baixo (ou setas / W S).
+  Você é o drone AMARELO. Os robôs ROSA são a IA aprendendo.
+
+TECLAS SÓ PARA VOCÊS (teclado do notebook)
+  1 / 2 / 3  velocidade do treino: ×1 / ×5 / ×20 (só na tela de espera)
+  R (segure 2 segundos)  reseta a IA do zero — bom quando chega turma nova,
+                         para eles verem a máquina "nascer burra" e aprender
+  F          tela cheia liga/desliga
+
+DICAS PARA O STAND
+  - Com ×20, a IA fica boa em ~1 minuto. Com ×1, em ~3–5 minutos.
+  - Depois de uns 5 minutos treinando, quase ninguém ganha da máquina.
+    Se quiser que a turma tenha chance, resete (R) de tempos em tempos.
+  - O placar e a IA ficam salvos no navegador: fechar e abrir de novo continua
+    de onde parou. Para zerar o placar dos humanos: F12 > Console >
+    localStorage.clear()  e recarregue.
+
+PARA PROGRAMADORES
+  src/world.js   física e obstáculos       src/nn.js     rede neural 6-6-1
+  src/ga.js      algoritmo genético         src/main.js   loop e telas
+  src/cards.js   textos dos cartões         testes: npm test
