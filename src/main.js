@@ -17,14 +17,24 @@
   let result = null, nameEntry = null, toast = null;
   let cardIdx = Math.floor(rng() * 100), attractCard = null, attractCardT = 0;
 
-  const saveKey = g => 'hvm.v3.' + g.id; // v3: regras novas (nave mais fácil, corrida por tempo)
+  // v4: IA recomeça da geração 1 em todos os navegadores; os recordes humanos da v3 são mantidos
+  const saveKey = g => 'hvm.v4.' + g.id;
+  const oldSaveKey = g => 'hvm.v3.' + g.id;
   const popSize = () => game.popSize || H.POP_SIZE;
   const newPopulation = () => Array.from({ length: popSize() }, () => H.createNet(rng, game.nInputs, game.nOutputs || 1));
 
   function loadGame(i) {
     gameIdx = (i + GAMES.length) % GAMES.length;
     game = GAMES[gameIdx];
-    save = H.loadState(ls, saveKey(game));
+    let hasSave = false;
+    try { hasSave = !!ls.getItem(saveKey(game)); } catch (e) { /* sem storage */ }
+    if (hasSave) save = H.loadState(ls, saveKey(game));
+    else {
+      save = H.loadState(ls, oldSaveKey(game));
+      H.resetMachine(save);
+      Object.values(save.records || {}).forEach(r => { if (r) r.bestMachine = 0; });
+      H.saveState(ls, save, saveKey(game));
+    }
     if (!Number.isInteger(save.track)) save.track = 0;
     nets = restorePopulation(save.population);
     try { ls.setItem(GAME_KEY, game.id); } catch (e) { /* sem storage */ }
